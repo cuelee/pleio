@@ -1,4 +1,4 @@
-# Random Effect General(reg) `v1.0.0`(beta)
+# Random Effect General(REG) `v1.0.0`(beta)
 
 `reg` is a command line tool for performinig meta-analysis using
 GWAS summary statistics. `reg` also estimates cumulative density
