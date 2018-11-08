@@ -18,11 +18,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
 
-from pval_estim.estim import regPestim, hetPestim, pfun_estim
-from importance_sam.importance_sampling_REG import run_importance_sampling as runis
-from meta_code.regeneral import REG_optim
-from meta_code.LS import LS_chi
-from basic_tool.etc import *
+from framework.matrixIO import *
+from framework.meta_analysis import *
+from framework.parse import *
 import numpy as np
 import os, sys, traceback, argparse, time
 from decimal import *
@@ -67,26 +65,41 @@ class Logger(object):
         print (msg, file = self.log_fh);
         print (msg);
 
+def check_xtractmat_output(cur_path):
+    if os.path.isdir(os.path.join(cur_path, '_out_')):
+        if (os.path.exists(os.path.join(cur_path,'_out_','sumstats.list')) and os.path.exists(os.path.join(cur_path,'_out_','sumstats.re')) and os.path.exists(os.path.join(cur_path,'_out_','sumstats.sg'))): return(1);
+        else: return(0);
+    else: return (0);
 
-def onis(N,Rg,Re,isf):
-    runis(N= int(N), GenCor=Rg, RECor=Re, outfn = os.path.dirname(os.path.abspath(__file__))+"/"+isf);
+def verify_test(ft, fl):
+    for fi in ft:
+        if not fi in fl: raise ValueError('{} is not included in the summary statistics data.'.format(fi) );
+    new_ft = [x for x in fl if x in ft]
+    if len(new_ft) < 1: raise ValueError ('There is only one sumstats to test');
+    return(new_ft)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--out', default='regen',type=str,
     help='Output filename prefix. If --out is not set, REG will use regen as the '
     'default output filename prefix.')
 # Besic Random Effect Meta-analysis Flags
-parser.add_argument('--input', default=None, type=str,
-    help='input file: summary statistics data')
-parser.add_argument('--cor', default=None, type=str,
-    help='Prefix for genetic and environment correlation matrix files '
-    '[Prefix].rg and [Prefix].re. ')
+parser.add_argument('--sumstats', default=None, type=str,
+    help='input folder path: path to summary statistics data.')
+parser.add_argument('--test', default=None, type=str,
+    help='comma separated sumstats filename: Use the same file name from ./{sumstats}/_out_/sumstats.list ')
 parser.add_argument('--isf', default=None, type=str,
     help='Filename Prefix for Estimated null-distribution cumulative densities. ')
 parser.add_argument('--create', default = False, action='store_true',
     help='If this flag is set, REG will run importance sampling and create new isf. ')
-parser.add_argument('--nis', default = 1e6, type = float,
+parser.add_argument('--nis', default = 1e6, type = int,
     help='Number of samples for importance sampling. ')
+
+### generate inputf parser
+parser.add_argument('--snp', default='SNP', type=str,
+    help='Name of SNP column (if not a name that ldsc understands). NB: case insensitive.')
+parser.add_argument('--z', default='Z', type=str,
+    help='Name of z-score column (if not a name that ldsc understands). NB: case insensitive.')
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -108,48 +121,29 @@ if __name__ == '__main__':
         log.log('Beginning analysis at {T}'.format(T=time.ctime()));
         start_time = time.time()
 
-        if args.input is None:
-            raise ValueError('Must specify --input with data.');
-        if args.cor is None:
-            log.log('No inputs for --cor: Rg and Re are diagonal of ones.');
-        if args.isf is None:
-            log.log('No inputs for --isf: Use {}.isf instead.'.format(args.out));
-        
-        isf = os.path.basename(args.isf)+".is";
-        Rg = load_mat(args.cor+'.rg');Re = load_mat(args.cor+'.rg');
-        
-        if args.create:
-            log.log('Importance sampling will generate new isf with {} samples. '.format(args.nis));
-            onis(N = args.nis, Rg = Rg, Re = Re, isf = isf);
-            
-        with open(args.input,"r") as fin:
-            i = 0;
-            for line in fin:
-                i = i + 1;
-        ninput = i;
-        del i
+        if args.sumstats is None:
+            raise ValueError('Must specify --sumstats with data folder');
+ 
+        if args.sumstats is not None: 
+            if args.test is not None:
+                fl = list_files_in_directory_slience(args.sumstats)
+                ft = verify_test(args.test.split(','), fl)
+            if not check_xtractmat_output(args.sumstats):
+                raise ValueError('Cannot find xtract outputs')
+            if (True):
+                inputf = args.out+'.ss.gz'; Sgf = args.out+'.sg'; Ref = args.out+'.re'
+                generate_meta_analysis_input_files(inputf, Sgf, Ref, ft, fl, args, log)
+            if args.isf is None:
+                log.log('No inputs for --isf: Use _isf_/{}.is instead.'.format(args.out));
+                ensure_dir(os.path.join(args.sumstats,'_isf_')); isf = os.path.join(args.sumstats,'_isf_',args.out+'.is');
+            else:
+                isf = os.path.join(args.sumstats,'_isf_',args.isf+'.is');
+                if not os.path.exists(isf):
+                    raise ValueError('Can\'t find {}'.format(isf));
+            if not float(args.nis) > float(1e5):
+                log.log('We advise you to have --nis greater than 100000')
 
-        reg_itck, reg_etck, het_mtck, het_itck, het_etck, tck_lim = pfun_estim(os.path.dirname(os.path.abspath(__file__))+"/"+isf)
-        
-        with open(args.input,"r") as fin, open(args.out,"w") as fout:
-            Sreg = [0.0]*ninput;
-            Preg = [Decimal(0)]*ninput;
-            Shet = [0.0]*ninput;
-            nShet = [0]*ninput;
-            Phet = [Decimal(0)]*ninput;
-            i = 0;
-            for line in fin:
-                cin = line.strip().split();
-                n = int(len(cin[1:])/2);
-                cvar = cin[0];
-                css = cin[1:];
-                cbeta = np.array([float(css[i*2]) for i in range(n)]);
-                cstder = np.array([float(css[i*2+1]) for i in range(n)]);
-                Sreg[i], Shet[i] = REG_optim(beta=cbeta, stder=cstder, Rg=Rg, Re=Re, n=n)
-                Preg[i] = regPestim(cstat=Sreg[i], inter_tck=reg_itck, extra_tck=reg_etck, tck_lim=tck_lim)
-                Phet[i] = hetPestim(cstat=Shet[i], mtck = het_mtck, inter_tck=het_itck, extra_tck=het_etck, tck_lim=tck_lim)
-                print(" ".join(map(str,[cvar, Sreg[i], Preg[i], Shet[i], Phet[i]])),file = fout);
-                i = i + 1;
+            meta_analysis(inputf, isf, Sgf, Ref, args, log)
 
     except Exception:
         ex_type, ex, tb = sys.exc_info();

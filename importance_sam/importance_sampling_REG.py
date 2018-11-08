@@ -24,8 +24,8 @@ from decimal import *
 #import pandas as pd
 from scipy.stats import multivariate_normal
 from scipy.optimize import minimize
-from importance_sam.methods.regeneral_Z import REG_optim_Z, REG_apply_Z
-from importance_sam.methods.LS import LS_chi, LS_apply
+from meta_code.regeneral import REG_optim, REG_apply
+from meta_code.LS import LS_chi, LS_apply
 from importance_sam.etc.time import *
 
 #os.path.basename(__file__);
@@ -120,23 +120,23 @@ def svd_inv(cov_t):
     return(inv_cov_t)
 
 ## GenCor and RECor: np.matrix, N: int
-def run_importance_sampling(N, GenCor, RECor, outfn):
+def run_importance_sampling(N, GenCov, RECor, outfn):
     print('\n Cue Hyunkyu Lee: {}'.format(os.path.basename(__file__)));
     start_time = get_time();
     cur_time(' Job started at');
     outfile = outfn;
 
-    n = nstudy = GenCor.shape[0];
+    n = nstudy = GenCov.shape[0];
     
     s_stders = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
     nPj = len(s_stders);
     s_means = [0]*nPj;
     probs= [1/nPj]*nPj;
     
-    Rg = GenCor; Re = RECor;
+    Sg = GenCov; Re = RECor;
     
     tau = 0;
-    H = get_H(tau, Rg, Re);
+    H = get_H(tau, Sg, Re);
     
     Pj = setPj(s_means = s_means, s_stders = s_stders, H = H, nstudy = n);
     
@@ -149,8 +149,7 @@ def run_importance_sampling(N, GenCor, RECor, outfn):
     
     print(" Finished sampling of {} variants".format(len(X)));
     
-    REG_X, HET_X = REG_apply_Z(Rg=Rg, Re=Re, n=n, X=X, row_wise = True);
-    nzh = [1 if HET_X[i] > 1e-10 else 0 for i in range(N)]
+    REG_X = REG_apply(Sg=Sg, Re=Re, n=n, X=X, row_wise = True);
     
     pdf_Q = multivariate_normal.pdf(x = X, mean = null_means, cov = null_cov);
     pdf_Pj = estim_prob_Pj (Pj, X=X);
@@ -158,7 +157,6 @@ def run_importance_sampling(N, GenCor, RECor, outfn):
     thres_vec = [ float(i)/10 for i in range(10) ] + [ float(i+1) for i in range(30) ];
     no_test = len(thres_vec)
     reg_estim = [float(0)] * no_test;    
-    het_estim = [float(0)] * no_test;   
 
     k = 0;
     for thres in thres_vec:
@@ -176,23 +174,14 @@ def run_importance_sampling(N, GenCor, RECor, outfn):
         control_variate_reg = vector_sum(const_mul(betas_reg, pdf_Pj));
         nominator_reg = [ h_reg[i] * pdf_Q[i] - control_variate_reg[i] for i in range(len(pdf_Q)) ];
         reg_estim[k] = sum( nominator_reg[i] / denominator[i] for i in range(len(pdf_Q))) /N + np.sum(betas_reg);
-
-        h_het = h_t(ts = HET_X, thres = thres);
-        m_het = [h_het[i] * pdf_Q[i] / Palpha[i] for i in range(len(pdf_Q))];
-        cov_tm_het = estim_cov_tm(pdf_Pj, m_het);
-
-        betas_het = [inv_cov_t.dot(cov_tm_het)[0,i] for i in range(nPj)];
-        control_variate_het = vector_sum(const_mul(betas_het, pdf_Pj));
-        nominator_het = [ h_het[i] * pdf_Q[i] - control_variate_het[i] for i in range(len(pdf_Q)) ];
-        het_estim[k] = sum( nominator_het[i] / denominator[i] for i in range(len(pdf_Q))) /N + np.sum(betas_het);
-        print("\t{}: {}, {}".format(thres,reg_estim[k],het_estim[k]));
+        print("\t{}: {}".format(thres,reg_estim[k]));
 
         k=k+1;
 
     ## print(output)
     print('\n Importance samping result');
     with open(outfile,'w') as fin:
-        [print('{} {} {}'.format(thres_vec[i],reg_estim[i],het_estim[i]),file=fin) for i in range(no_test)];
+        [print('{} {}'.format(thres_vec[i],reg_estim[i]),file=fin) for i in range(no_test)];
 
     run_time = get_time() - start_time;
     print(' Analysis time: {} sec'.format(round(run_time,3)));

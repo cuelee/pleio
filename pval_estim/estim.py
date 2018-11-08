@@ -1,9 +1,24 @@
 from scipy import interpolate
 from decimal import *
-from pval_estim.readf import readf
+
+def readf(afile):
+    with open(afile,'r') as fin:
+        n = 0;
+        for line in fin:
+            n = n + 1;
+
+    with open(afile,'r') as fin:
+        x = [0] * n;
+        reg = [0] * n;
+        i = 0;
+        for line in fin:
+            std = line.strip().split();
+            x[i] = float(std[0]);
+            reg[i] = float(std[1]);
+            i = i + 1;
+    return(x, reg)
 
 def estim_interPfun(x,y):
-    y[0]=1;
     return(interpolate.splrep(x, y, s=0));
 
 def estim_extraPfun(x,y):
@@ -35,12 +50,12 @@ def estim_stat_extralinear(aval, extra_tck):
         res = tck_y[ivalue];
     return(res);
 
-def regPestim(cstat, inter_tck, extra_tck, tck_lim):
-    if (cstat <= tck_lim):
-        res = Decimal( str( interpolate.splev(cstat, inter_tck, der=0)));
-    elif(cstat > tck_lim):
-        res = extrapolate_cue(cstat, extra_tck);
-    return(res);
+#def regPestim(cstat, inter_tck, extra_tck, tck_lim):
+#    if (cstat <= tck_lim):
+#        res = Decimal( str( interpolate.splev(cstat, inter_tck, der=0)));
+#    elif(cstat > tck_lim):
+#        res = extrapolate_cue(cstat, extra_tck);
+#    return(res);
 
 def manPestim(cstat, mtck):
     x=mtck[0];y=mtck[1];
@@ -49,7 +64,7 @@ def manPestim(cstat, mtck):
     diff = y[ci+1] - y[ci];
     return( y[ci] + diff * cf );
 
-def hetPestim(cstat, mtck, inter_tck, extra_tck, tck_lim):
+def regPestim(cstat, mtck, inter_tck, extra_tck, tck_lim):
     if (cstat <= 0.1):
         res = Decimal( manPestim(cstat, mtck) );
     elif (cstat > 0.1 and cstat <= tck_lim):
@@ -59,17 +74,16 @@ def hetPestim(cstat, mtck, inter_tck, extra_tck, tck_lim):
     return(res);
 
 def pfun_estim(isf):
-    x,reg,het = readf(isf);
+    x,reg = readf(isf);
+    reg[0]=1;
 
     x1 = [ x[i] for i in range(len(x)) if x[i] <= 0.1 ];
-    het1 = [ het[i] for i in range(len(x)) if x[i] <= 0.1 ];
+    reg1 = [ reg[i] for i in range(len(x)) if x[i] <= 0.1 ];
 
     x2 = [ x[i] for i in range(len(x)) if x[i] > 0.1 and x[i] <= 30 ];
-    het2 = [ het[i] for i in range(len(x)) if x[i] > 0.1 and x[i] <= 30 ];
-    reg_itck = estim_interPfun(x,reg);
-    reg_etck = estim_extraPfun(x,reg);
+    reg2 = [ reg[i] for i in range(len(x)) if x[i] > 0.1 and x[i] <= 30 ];
 
-    het_mtck = [x1,het1];
-    het_itck = estim_interPfun(x2,het2);
-    het_etck = estim_extraPfun(x2,het2);
-    return(reg_itck, reg_etck, het_mtck, het_itck, het_etck, x[-1]);
+    reg_mtck = [x1,reg1];
+    reg_itck = estim_interPfun(x2,reg2);
+    reg_etck = estim_extraPfun(x2,reg2);
+    return(reg_mtck, reg_itck, reg_etck, x[-1]);
