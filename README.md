@@ -55,7 +55,7 @@ the pleiotropic effects.]
 
 ## License 
 
-This project is licensed under GNU GPL v3.
+This project has no license currently.
 
 ## Authors
 Cue Hyunkyu Lee ( Seoul National University )
