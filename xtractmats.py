@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 '''
-REG : Pair Wise LDSC(getMartices)
+REG : eXtract covariance and correlation matrix using pair Wise LDSC(XtractMartices)
 Copyright(C) 2018 Cue Hyunkyu Lee 
 
 REG is a command line tool for performing cross-disease meta-analysis

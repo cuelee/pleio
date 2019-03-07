@@ -1,5 +1,4 @@
 ## Dependancies : 
-import math
 import numpy as np
 from scipy.stats import multivariate_normal 
 from scipy.optimize import minimize
@@ -11,8 +10,8 @@ def likelihood_mvn_tp (pars, x, Sg, sigma_e, n):
     mu = [0]*n; ## optim pars 
     tau = pars[0];
     sigma_g = tau * Sg;
-    sigma_ge = sigma_g + sigma_e;
-    k = multivariate_normal.logpdf(x = x, mean = mu, cov = sigma_ge);
+    sigma = sigma_g + sigma_e;
+    k = multivariate_normal.logpdf(x = x, mean = mu, cov = sigma);
     return(-1 * k);
 
 def REG_optim (beta, stder, Sg, Re, n, bnds = [(0,200)]):
@@ -20,10 +19,10 @@ def REG_optim (beta, stder, Sg, Re, n, bnds = [(0,200)]):
     res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='SLSQP', bounds = bnds, args=(beta, Sg, sigma_e, n), options = {'ftol' : 1e-9, 'disp':False});
     if (res.success != True):
         print(res.success)
-    ta = res.x[0];
+    tau = res.x[0];
     alt_var = -1 * res.fun;
     nul_var = multivariate_normal.logpdf( x = beta, mean = [0]*n, cov = sigma_e);
-    return( max(2 * (alt_var - nul_var),0.0) );
+    return( max(2 * (alt_var - nul_var), 0.0) );
 
 def REG_apply(Sg, Re, n, X, row_wise):
     stder = [1]*n;

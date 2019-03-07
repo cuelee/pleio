@@ -167,12 +167,12 @@ def correct_inflation_in_sumstats(intercept, ofh, nfh):
         for line in fin:
             if flr:
                 flr = False; col = line.strip().split(); z = col.index('Z'); lcol = len(col);
-                print(line,file=fout);
+                print(line.strip(),file=fout);
                 continue
             std = line.strip().split();
             if len(std) == lcol:
                 zs = float(std[z]) / np.sqrt(intercept); std[z] = str(zs);
-                print(' '.join(std), file=fout);
+                print('\t'.join(std), file=fout);
             else:
                 continue
 
