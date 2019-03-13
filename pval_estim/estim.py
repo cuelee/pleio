@@ -21,33 +21,33 @@ def readf(afile):
 def estim_interPfun(x,y):
     return(interpolate.splrep(x, y, s=0));
 
-def estim_extraPfun(x,y):
-    diff = [ y[i+1] /  y[i] for i in range(len(y)-1) ];
-    ratio = round( 1 / len(diff[-10:]) * sum(diff[-10:]),100 );
-    newx = [ x[i] for i in range(len(x)) ];
-    newy = [ Decimal(y[i]) for i in range(len(y)) ];
-    irange = [ i + len(x) for i in range(10001-len(x)) ];
+def estim_extraPfun(x,y,interval=10):
+    dtab = dict()
+    for i in range(len(x)):
+        dtab[x[i]]=Decimal(y[i]);
+    top=max(list(dtab.keys()))
+    ran = [ top-interval+i for i in range(interval) ]
+    diff = [ dtab[i+1] / dtab[i] for i in ran]
+    ratio = Decimal(1 / len(ran)) * sum(diff);
+    irange = [ i + 1 + int(top) for i in range(10001-int(top)) ];
     for i in irange:
-        newx.append(i);
-        newy.append(Decimal(newy[i-1]*Decimal(ratio)));
-    return([newx,newy]);    
+        dtab[i]=Decimal(dtab[i-1])*Decimal(ratio)
+    return(dtab);
 
-def extrapolate_cue(x, extra_tck):
-    res = estim_stat_extralinear(x,extra_tck);
+def extrapolate_cue(x, dtab):
+    res = estim_stat_extralinear(x,dtab);
     return(res);
 
-def estim_stat_extralinear(aval, extra_tck):
-    tck_x = extra_tck[0];
-    tck_y = extra_tck[1];
+def estim_stat_extralinear(aval, dtab):
     if(aval > 10000 ):
         aval = Decimal(10000);
     ivalue = int(round(aval));
     fvalue = Decimal(aval - ivalue);
     if(fvalue > 0):
-        diff = Decimal(tck_y[ivalue+1] - tck_y[ivalue]);
-        res = tck_y[ivalue] + Decimal(diff * fvalue);
+        diff = Decimal(dtab[ivalue+1] - dtab[ivalue]);
+        res = dtab[ivalue] + Decimal(diff * fvalue);
     else:
-        res = tck_y[ivalue];
+        res = dtab[ivalue];
     return(res);
 
 #def regPestim(cstat, inter_tck, extra_tck, tck_lim):
@@ -64,26 +64,31 @@ def manPestim(cstat, mtck):
     diff = y[ci+1] - y[ci];
     return( y[ci] + diff * cf );
 
-def regPestim(cstat, mtck, inter_tck, extra_tck, tck_lim):
+def pestim(cstat, iso):
     if (cstat <= 0.1):
-        res = Decimal( manPestim(cstat, mtck) );
-    elif (cstat > 0.1 and cstat <= tck_lim):
-        res = Decimal( str( interpolate.splev(cstat, inter_tck, der=0)));
-    elif (cstat > tck_lim):
-        res = extrapolate_cue( cstat, extra_tck );
+        res = Decimal( manPestim(cstat, iso.mtck) );
+    elif (cstat > 0.1 and cstat <= iso.tck_lim):
+        res = Decimal( str( interpolate.splev(cstat, iso.itck, der=0)));
+    elif (cstat > iso.tck_lim):
+        res = extrapolate_cue( cstat, iso.dtab );
     return(res);
 
 def pfun_estim(isf):
-    x,reg = readf(isf);
-    reg[0]=1;
+    class pfun_input(object):
+        def __init__(self,isf):
+            x,reg = readf(isf);
+            self.tck_lim = x[-1];
+            reg[0]=1;
+        
+            x1 = [ x[i] for i in range(len(x)) if x[i] <= 0.1 ];
+            reg1 = [ reg[i] for i in range(len(x)) if x[i] <= 0.1 ];
+        
+            x2 = [ x[i] for i in range(len(x)) if x[i] >= 0.1 and x[i] <= self.tck_lim ];
+            reg2 = [ reg[i] for i in range(len(x)) if x[i] >= 0.1 and x[i] <= self.tck_lim ];
 
-    x1 = [ x[i] for i in range(len(x)) if x[i] <= 0.1 ];
-    reg1 = [ reg[i] for i in range(len(x)) if x[i] <= 0.1 ];
+            self.mtck = [x1,reg1];
+            self.itck = estim_interPfun(x2,reg2);
+            self.dtab = estim_extraPfun(x2,reg2);
 
-    x2 = [ x[i] for i in range(len(x)) if x[i] > 0.1 and x[i] <= 30 ];
-    reg2 = [ reg[i] for i in range(len(x)) if x[i] > 0.1 and x[i] <= 30 ];
-
-    reg_mtck = [x1,reg1];
-    reg_itck = estim_interPfun(x2,reg2);
-    reg_etck = estim_extraPfun(x2,reg2);
-    return(reg_mtck, reg_itck, reg_etck, x[-1]);
+    importance_sampling_output = pfun_input(isf);
+    return(importance_sampling_output);

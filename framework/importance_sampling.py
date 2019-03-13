@@ -24,7 +24,7 @@ import pandas as pd
 from decimal import *
 from scipy.stats import multivariate_normal
 from scipy.optimize import minimize
-from meta_code.regeneral import REG_optim, REG_apply
+from meta_code.regeneral import REG_optim
 from meta_code.LS import LS_chi, LS_apply
 
 #os.path.basename(__file__);
@@ -40,15 +40,13 @@ def generate_Pj (means, stders, cov, nstudy):
 
 ### sampling from mixture densities
 def mixture_sampling (nsample, probs, Pj):
-    nP = len(probs); choices = [i for i in range(nP)]; N = nsample;
+    nP = len(probs); choices = [i for i in range(nP)]; N = nsample; count = [0] * nP; df = pd.DataFrame();
     comp = np.random.choice(choices, N, replace = True, p = probs);
-    array = np.empty((0,len(Pj[0][0])), int); count = [0] * nP;
     for i in range(len(comp)): count[comp[i]] += 1;
     for i in range(nP):
         cmean = Pj[0][i]; ccov = Pj[1][i]; cN = count[i];
-        appended = np.random.multivariate_normal(mean = cmean, cov = ccov, size = cN);
-        array=np.append(array,appended,axis=0);
-    df = pd.DataFrame(array);
+        adf = pd.DataFrame(np.random.multivariate_normal(mean = cmean, cov = ccov, size = cN));
+        df = df.append(adf,ignore_index=True);
     return(df);
 
 def get_H (tau, U, R): 
@@ -126,13 +124,9 @@ def importance_sampling(N, Sg, Re, outfn):
     
     ## generate sample X
     X = mixture_sampling (nsample = N, probs = probs, Pj=Pj);
-    
-    def rowwise_optim(x, se, Sg, Re, n):
-        s = REG_optim(beta=x, stder=se, Sg=Sg, Re=Re, n=n)
-        return(s)
 
     print( "Generating {len_X} stats.".format( len_X=len(X) ) ); 
-    REG_X = X.apply(lambda x: rowwise_optim(x.tolist(), se, Sg, Re, n), axis=1)
+    REG_X = X.apply(lambda x: REG_optim(x.tolist(), se, Sg, Re, n), axis=1)
     
     null_Re = Re; null_means = [0]*n; null_std = np.diag([1]*n);
     null_cov = null_std.dot(null_Re).dot(null_std);
@@ -141,7 +135,7 @@ def importance_sampling(N, Sg, Re, outfn):
     d_Pj = estim_prob_Pj (Pj, X = X);
    
     ### It is recommended to get tabulated pdf at 0.1, 0.2, 0.3 ... 1.0, 2.0, 3.0,.... 31.0.  
-    thres_vec = [ float(i)/10 for i in range(10) ] + [ float(i+1) for i in range(30) ]; ntest = len(thres_vec);
+    thres_vec = [ float(i)/10 for i in range(10) ] + [ float(i+1) for i in range(35) ]; ntest = len(thres_vec);
     reg_estim = [float(0)] * ntest;    
 
     k = 0;

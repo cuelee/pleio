@@ -18,14 +18,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
 
-from framework.meta_analysis import *
+#from framework.meta_analysis import *
 from framework.parse import *
 from framework.importance_sampling import importance_sampling as imsa
-from pval_estim.estim import pfun_estim
+from pval_estim.estim import pfun_estim, pestim
+from meta_code.regeneral import REG_optim
 import numpy as np
 import pandas as pd
 import os, sys, traceback, argparse, time
-from decimal import *
+
+
+
 
 codename = 'REG'
 __version__ = 'beta 1.0.0'
@@ -211,6 +214,34 @@ def generate_mode_class_array_object(ssin, cain, log):
         raise
     return(mode_carray)
 
+
+def meta_analysis(df, isres, args, log):
+    '''
+    The function integrates multiple summary statistics and provide data frames of pvalues and pooled log OR 
+    df is a python class object which contains 1. summary statistics(dataframe), 
+    2. Genetic Covariance matrix(numpy matrix) 3. Random errors(numpy matrix) 
+    isres is a python class object which contains tabulated importance sampling results to estimate pvalues  
+    '''
+    Sg=df.Sg; Re=df.Re; dat = df.metain;
+
+    res = pd.DataFrame(dat[['SNP']])
+
+    def rowwise_optim(x, se, Sg, Re, n):
+        s = REG_optim(beta=x, stder=se, Sg=Sg, Re=Re, n=n)
+        return(s)
+
+    def rowwise_pestim(s,mtck,itck,dtab,tck_lim):
+        p = pestim(cstat=s, iso = isres)
+        return(p)
+
+    n = Sg.shape[1];
+    se=[1]*n
+    res['stat'] = dat.apply(lambda x: rowwise_optim(x.tolist()[1:], se, Sg, Re, n), axis=1)
+    res['Pvalue'] = res.apply(lambda x: rowwise_pestim(x['stat'], mtck, itck, etck, tck_lim), axis=1)
+
+    return(res)
+
+
 def mvp(args,log):
 
     def print_camod(camod):
@@ -219,10 +250,6 @@ def mvp(args,log):
             print(camod[i].Sg)
             print(camod[i].Re)
 
-    class tabulated_dist(object):
-        def __init__(self, isf):
-            self.mtck, self.itck, self.etck, self.tck_lim = pfun_estim(isf);
-        
    ### Read inputs as a class_array_object 
     ssin = setup_input_files(args ,log);
     cain = generate_input_class_array_object(ssin,log);
@@ -238,7 +265,7 @@ def mvp(args,log):
         
         if args.create:
             imsa(N = ssin.default_nis ,Sg = camod[i].Sg, Re = camod[i].Re, outfn = is_path);
-            isres = tabulated_dist(is_path);
+            isres = pfun_estim(isf);
         else:
             quit('The feature has not been supported yet');
  
