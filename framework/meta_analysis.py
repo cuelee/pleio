@@ -1,4 +1,4 @@
-from pval_estim.estim import regPestim
+from pval_estim.estim import pestim
 from meta_code.regeneral import REG_optim
 from framework.parse import *
 import pandas as pd

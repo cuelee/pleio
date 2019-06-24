@@ -64,31 +64,24 @@ def manPestim(cstat, mtck):
     diff = y[ci+1] - y[ci];
     return( y[ci] + diff * cf );
 
-def pestim(cstat, iso):
+def pvalue_estimation(cstat, iso):
     if (cstat <= 0.1):
         res = Decimal( manPestim(cstat, iso.mtck) );
     elif (cstat > 0.1 and cstat <= iso.tck_lim):
         res = Decimal( str( interpolate.splev(cstat, iso.itck, der=0)));
     elif (cstat > iso.tck_lim):
         res = extrapolate_cue( cstat, iso.dtab );
-    return(res);
+    return(float(res));
 
-def pfun_estim(isf):
-    class pfun_input(object):
-        def __init__(self,isf):
-            x,reg = readf(isf);
-            self.tck_lim = x[-1];
-            reg[0]=1;
-        
-            x1 = [ x[i] for i in range(len(x)) if x[i] <= 0.1 ];
-            reg1 = [ reg[i] for i in range(len(x)) if x[i] <= 0.1 ];
-        
-            x2 = [ x[i] for i in range(len(x)) if x[i] >= 0.1 and x[i] <= self.tck_lim ];
-            reg2 = [ reg[i] for i in range(len(x)) if x[i] >= 0.1 and x[i] <= self.tck_lim ];
-
-            self.mtck = [x1,reg1];
-            self.itck = estim_interPfun(x2,reg2);
-            self.dtab = estim_extraPfun(x2,reg2);
-
-    importance_sampling_output = pfun_input(isf);
-    return(importance_sampling_output);
+class pfun_estim(): 
+    def __init__(self,isf):
+        x,reg = readf(isf);
+        self.tck_lim = x[-1];
+        reg[0]=1;
+        x1 = [ x[i] for i in range(len(x)) if x[i] <= 0.1 ];
+        reg1 = [ reg[i] for i in range(len(x)) if x[i] <= 0.1 ];
+        x2 = [ x[i] for i in range(len(x)) if x[i] >= 0.1 and x[i] <= self.tck_lim ];
+        reg2 = [ reg[i] for i in range(len(x)) if x[i] >= 0.1 and x[i] <= self.tck_lim ];
+        self.mtck = [x1,reg1];
+        self.itck = estim_interPfun(x2,reg2);
+        self.dtab = estim_extraPfun(x2,reg2);

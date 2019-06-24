@@ -4,40 +4,26 @@ REG: Random Effect General Method
 Copyright(C) 2018 Cue Hyunkyu Lee 
 
 REG is a command line tool for performing cross-disease meta-analysis
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
 
 #from framework.meta_analysis import *
 from framework.parse import *
 from framework.importance_sampling import importance_sampling as imsa
-from pval_estim.estim import pfun_estim, pestim
-from meta_code.regeneral import REG_optim
+from framework.significance_estimation import pfun_estim, pvalue_estimation
+from meta_code.variance_component import vc_optimization 
 import numpy as np
 import pandas as pd
 import os, sys, traceback, argparse, time
 
 
-
-
-codename = 'REG'
+codename = 'DELPY'
 __version__ = 'beta 1.0.0'
 MASTHEAD = "************************************************************\n"
-MASTHEAD += "* General Random Effect Model (REG)\n"
+MASTHEAD += "* DEtect Locus with PleiotropY({c})\n".format(c=codename)
 MASTHEAD += "* Version {V}\n".format(V=__version__)
 MASTHEAD += "* (C)2018 Cue H. Lee\n"
 MASTHEAD += "* Seoul National University\n"
-MASTHEAD += "* GNU General Public License v3\n"
+MASTHEAD += "* Unlicensed software"
 MASTHEAD += "************************************************************\n"
 
 def sec_to_str(t):
@@ -224,25 +210,17 @@ def meta_analysis(df, isres, args, log):
     '''
     Sg=df.Sg; Re=df.Re; dat = df.metain;
 
-    res = pd.DataFrame(dat[['SNP']])
-
-    def rowwise_optim(x, se, Sg, Re, n):
-        s = REG_optim(beta=x, stder=se, Sg=Sg, Re=Re, n=n)
-        return(s)
-
-    def rowwise_pestim(s,mtck,itck,dtab,tck_lim):
-        p = pestim(cstat=s, iso = isres)
-        return(p)
+    summary = pd.DataFrame(dat[['SNP']])
 
     n = Sg.shape[1];
     se=[1]*n
-    res['stat'] = dat.apply(lambda x: rowwise_optim(x.tolist()[1:], se, Sg, Re, n), axis=1)
-    res['Pvalue'] = res.apply(lambda x: rowwise_pestim(x['stat'], mtck, itck, etck, tck_lim), axis=1)
+    summary['stat'] = dat.apply(lambda x: vc_optimization(x.tolist()[1:], se, Sg, Rn, n), axis=1)
+    summary['Pvalue'] = res.apply(lambda x: pvalue_estimation(x['stat'], iso), axis=1)
 
-    return(res)
+    return(summary)
 
 
-def mvp(args,log):
+def delpy(args,log):
 
     def print_camod(camod):
         for i in range(len(camod)):
@@ -253,6 +231,7 @@ def mvp(args,log):
    ### Read inputs as a class_array_object 
     ssin = setup_input_files(args ,log);
     cain = generate_input_class_array_object(ssin,log);
+    quit()
     log.log('Read {} Summary statistics from the summary statistics directory '.format(len(cain)));
     #log.log('Read {} Summary statistics'.format(len(cain)));
     camod = generate_mode_class_array_object(ssin, cain, log);
@@ -265,15 +244,15 @@ def mvp(args,log):
         
         if args.create:
             imsa(N = ssin.default_nis ,Sg = camod[i].Sg, Re = camod[i].Re, outfn = is_path);
-            isres = pfun_estim(isf);
+            iso = pfun_estim(isf);
         else:
             quit('The feature has not been supported yet');
  
-        res = meta_analysis(camod[i], isres, args, log)
+        summary = meta_analysis(camod[i], iso, args, log)
     
         result_fn = 'res_mod_{mode_number}_result.gz'.format(mode_number=str(i));
-        res_path = os.path.join(outdir,result_fn);
-        res.to_csv(res_path, index = False, sep='\t', compression='gzip');
+        out_path = os.path.join(outdir,result_fn);
+        summary.to_csv(out_path, index = False, sep='\t', compression='gzip');
 
     quit('work done')
 
@@ -330,7 +309,7 @@ if __name__ == '__main__':
             if args.create is not True and args.isf is None:
                 raise ValueError('--create or --isf flag should be defined') 
 
-            mvp(args,log)
+            delpy(args,log)
 
         else:
             print (header)

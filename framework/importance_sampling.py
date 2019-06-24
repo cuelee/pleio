@@ -21,6 +21,8 @@
 
 import numpy as np
 import pandas as pd
+import multiprocessing as mp
+from itertools import product
 from decimal import *
 from scipy.stats import multivariate_normal
 from scipy.optimize import minimize
@@ -110,9 +112,56 @@ def svd_inv(cov_t):
     inv_cov_t = vs.dot(ds).dot(np.transpose(us));
     return(inv_cov_t)
 
+def ims_estimate_statistics(df_data, se, Sg, Re, n):
+    df_out = pd.DataFrame(index = df_data.index)
+    df_out['stats'] =df_data.apply(lambda x: REG_optim(x.tolist(), se, Sg, Re, n), axis=1)
+    return(df_out)
+
+def ims_parallelize(df_input, func, cores, partitions, se, Sg, Re, n):
+    data_split = np.array_split(df_input, partitions)
+    iterable = product(data_split, [se], [Sg], [Re], [n])
+    pool = mp.Pool(int(cores))
+    df_output = pd.concat(pool.starmap(func, iterable))
+    pool.close()
+    pool.join()
+    return(df_output)
+
+
+def thres_estimate_pvalue(thres, REG_X, Palpha, probs, d_Q, d_Pj, nPj, N):
+    h_reg = h_t(ts = REG_X, thres = thres);
+    m_reg = [h_reg[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
+    cov_tm_reg = estim_cov_tm(d_Pj, m_reg); 
+    cov_t = estim_cov_t(d_Pj, Palpha);
+    inv_cov_t = svd_inv(cov_t);
+    denominator = vector_sum(const_mul(probs, d_Pj));
+    betas_reg = [inv_cov_t.dot(cov_tm_reg)[0,i] for i in range(nPj)];
+    control_variate_reg = vector_sum(const_mul(betas_reg, d_Pj));
+    nominator_reg = [ h_reg[i] * d_Q[i] - control_variate_reg[i] for i in range(len(d_Q)) ];
+    res = sum( nominator_reg[i] / denominator[i] for i in range(len(d_Q))) /N + np.sum(betas_reg);
+    return(pd.DataFrame([res], columns = ['pvalue'], index = [thres]))
+
+
+def thres_parallelize(thres_vec, func, cores, REG_X, Palpha, probs, d_Q, d_Pj, nPj, N):
+    iterable = product(thres_vec, [REG_X], [Palpha], [probs], [d_Q], [d_Pj], [nPj], [N])
+    pool = mp.Pool(int(cores))
+    res_list = pd.concat(pool.starmap(func, iterable))
+    pool.close()
+    pool.join()
+    return(res_list)
+
 ## GenCor and RECor: np.matrix, N: int, outfn: str
-def importance_sampling(N, Sg, Re, outfn):
-    outfile = outfn;
+def importance_sampling(N, Sg, Re, outfn, mp_cores):
+    
+    ### set multi processing options 
+    #mp.set_start_method('spawn')
+    if(mp_cores == 0):
+        cores = mp.cpu_count();
+        partitions = cores;
+    else:
+        cores = mp_cores;
+        partitions = cores;
+
+    output_filename = outfn;
     
     n = nstudy = Sg.shape[0]; se=[1]*n;
    
@@ -123,44 +172,27 @@ def importance_sampling(N, Sg, Re, outfn):
     Pj = generate_Pj(means = mean_P, stders = std_P, cov = H, nstudy = n);
     
     ## generate sample X
-    X = mixture_sampling (nsample = N, probs = probs, Pj=Pj);
-
-    print( "Generating {len_X} stats.".format( len_X=len(X) ) ); 
-    REG_X = X.apply(lambda x: REG_optim(x.tolist(), se, Sg, Re, n), axis=1)
-    
+    df_input = mixture_sampling(nsample = N, probs=probs, Pj=Pj)
+    print( "Generating {len_X} stats.".format( len_X=N ) ); 
+    data = ims_parallelize(df_input, ims_estimate_statistics, cores, partitions, se, Sg, Re, n)
+    REG_X = data['stats'].tolist()
+   
     null_Re = Re; null_means = [0]*n; null_std = np.diag([1]*n);
     null_cov = null_std.dot(null_Re).dot(null_std);
 
-    d_Q = multivariate_normal.pdf(x = X, mean = null_means, cov = null_cov);
-    d_Pj = estim_prob_Pj (Pj, X = X);
+    d_Q = multivariate_normal.pdf(x = df_input, mean = null_means, cov = null_cov);
+    d_Pj = estim_prob_Pj (Pj, X = df_input);
    
     ### It is recommended to get tabulated pdf at 0.1, 0.2, 0.3 ... 1.0, 2.0, 3.0,.... 31.0.  
-    thres_vec = [ float(i)/10 for i in range(10) ] + [ float(i+1) for i in range(35) ]; ntest = len(thres_vec);
-    reg_estim = [float(0)] * ntest;    
+    thres_vec = [ float(i)/10 for i in range(10) ] + [ float(i+1) for i in range(40) ]; ntest = len(thres_vec);
+    pvalue_estim = pd.DataFrame(index = thres_vec);
 
-    k = 0;
-    for thres in thres_vec:
-
-        Palpha = vector_sum(const_mul(probs,d_Pj));
-        h_reg = h_t(ts = REG_X, thres = thres);
-        m_reg = [h_reg[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
-        cov_tm_reg = estim_cov_tm(d_Pj, m_reg); 
-
-        cov_t = estim_cov_t(d_Pj, Palpha);
-        inv_cov_t = svd_inv(cov_t);
-        denominator = vector_sum(const_mul(probs, d_Pj));
-
-        betas_reg = [inv_cov_t.dot(cov_tm_reg)[0,i] for i in range(nPj)];
-        control_variate_reg = vector_sum(const_mul(betas_reg, d_Pj));
-        nominator_reg = [ h_reg[i] * d_Q[i] - control_variate_reg[i] for i in range(len(d_Q)) ];
-        reg_estim[k] = sum( nominator_reg[i] / denominator[i] for i in range(len(d_Q))) /N + np.sum(betas_reg);
-#        print("\t{}: {}".format(thres,reg_estim[k]));
-
-        k=k+1;
-
-    ## print(output)
-    # print('\nImportance samping result');
-    with open(outfile,'w') as fin:
-        [print('{} {}'.format(thres_vec[i],reg_estim[i]),file=fin) for i in range(ntest)];
-
-    print('Finished estimating tabulated probability densities ');
+    Palpha = vector_sum(const_mul(probs,d_Pj));
+   
+    df_pvalue = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, REG_X, Palpha, probs, d_Q, d_Pj, nPj, N)
+    print('Completed estimating the inverse CDFs at different threshold values for DELPY\'s variance component model.'); 
+    
+    sorted_pvalue = df_pvalue.sort_index()
+    print(sorted_pvalue)
+    sorted_pvalue.to_csv(output_filename, header = False, index = True, sep = " ")
+    print('Wrote tabulated inverse cdf');
