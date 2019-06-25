@@ -14,7 +14,7 @@ def likelihood_mvn_tp (pars, x, Sg, Sn, n):
     return(-1 * k);
 
 def vc_optimization (b, se, Sg, Rn, n, bnds = [(0,200)]):
-    Sn = np.diag(se).dot(Re).dot(np.diag(se));
+    Sn = np.diag(se).dot(Rn).dot(np.diag(se));
     res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='SLSQP', bounds = bnds, args=(b, Sg, Sn, n), options = {'ftol' : 1e-9, 'disp':False});
     if (res.success != True):
         print(res.success)
@@ -33,9 +33,9 @@ def delpy_apply(Sg, Rn, n, X, row_wise):
     if(row_wise == True):
         for i in range(niter):
             b = X[i,:]; 
-            delpy_stats[i] = vc_optimization(b = b, se = se, Sg = Sg, Re = Rn, n = n);
+            delpy_stats[i] = vc_optimization(b = b, se = se, Sg = Sg, Rn = Rn, n = n);
     else:
         for i in range(niter):
             b = X[:,i]; 
-            delpy_stats[i] = vc_optimization(b = b, se = se, Sg = Sg, Re = Rn, n = n);
+            delpy_stats[i] = vc_optimization(b = b, se = se, Sg = Sg, Rn = Rn, n = n);
     return(float(delpy_stats))

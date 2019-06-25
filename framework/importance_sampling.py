@@ -1,20 +1,5 @@
 '''
-    REG: Random Effect General Method 
     Copyright(C) 2018 Cue Hyunkyu Lee
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 '''
 #!/bin/python3
 # dependency: numpy,scipy.stats, scipy.optimize,
@@ -26,7 +11,7 @@ from itertools import product
 from decimal import *
 from scipy.stats import multivariate_normal
 from scipy.optimize import minimize
-from meta_code.regeneral import REG_optim
+from meta_code.variance_component import vc_optimization
 from meta_code.LS import LS_chi, LS_apply
 
 #os.path.basename(__file__);
@@ -112,14 +97,14 @@ def svd_inv(cov_t):
     inv_cov_t = vs.dot(ds).dot(np.transpose(us));
     return(inv_cov_t)
 
-def ims_estimate_statistics(df_data, se, Sg, Re, n):
+def ims_estimate_statistics(df_data, se, Sg, Rn, n):
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['stats'] =df_data.apply(lambda x: REG_optim(x.tolist(), se, Sg, Re, n), axis=1)
+    df_out['stats'] =df_data.apply(lambda x: vc_optimization(x.tolist(), se, Sg, Rn, n), axis=1)
     return(df_out)
 
-def ims_parallelize(df_input, func, cores, partitions, se, Sg, Re, n):
+def ims_parallelize(df_input, func, cores, partitions, se, Sg, Rn, n):
     data_split = np.array_split(df_input, partitions)
-    iterable = product(data_split, [se], [Sg], [Re], [n])
+    iterable = product(data_split, [se], [Sg], [Rn], [n])
     pool = mp.Pool(int(cores))
     df_output = pd.concat(pool.starmap(func, iterable))
     pool.close()
@@ -127,8 +112,8 @@ def ims_parallelize(df_input, func, cores, partitions, se, Sg, Re, n):
     return(df_output)
 
 
-def thres_estimate_pvalue(thres, REG_X, Palpha, probs, d_Q, d_Pj, nPj, N):
-    h_reg = h_t(ts = REG_X, thres = thres);
+def thres_estimate_pvalue(thres, vc_stats, Palpha, probs, d_Q, d_Pj, nPj, N):
+    h_reg = h_t(ts = vc_stats, thres = thres);
     m_reg = [h_reg[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
     cov_tm_reg = estim_cov_tm(d_Pj, m_reg); 
     cov_t = estim_cov_t(d_Pj, Palpha);
@@ -141,8 +126,8 @@ def thres_estimate_pvalue(thres, REG_X, Palpha, probs, d_Q, d_Pj, nPj, N):
     return(pd.DataFrame([res], columns = ['pvalue'], index = [thres]))
 
 
-def thres_parallelize(thres_vec, func, cores, REG_X, Palpha, probs, d_Q, d_Pj, nPj, N):
-    iterable = product(thres_vec, [REG_X], [Palpha], [probs], [d_Q], [d_Pj], [nPj], [N])
+def thres_parallelize(thres_vec, func, cores, vc_stats, Palpha, probs, d_Q, d_Pj, nPj, N):
+    iterable = product(thres_vec, [vc_stats], [Palpha], [probs], [d_Q], [d_Pj], [nPj], [N])
     pool = mp.Pool(int(cores))
     res_list = pd.concat(pool.starmap(func, iterable))
     pool.close()
@@ -150,7 +135,7 @@ def thres_parallelize(thres_vec, func, cores, REG_X, Palpha, probs, d_Q, d_Pj, n
     return(res_list)
 
 ## GenCor and RECor: np.matrix, N: int, outfn: str
-def importance_sampling(N, Sg, Re, outfn, mp_cores):
+def importance_sampling(N, Sg, Rn, outfn, mp_cores):
     
     ### set multi processing options 
     #mp.set_start_method('spawn')
@@ -168,17 +153,17 @@ def importance_sampling(N, Sg, Re, outfn, mp_cores):
     ## Deterministic importance sampling needs probability density functions for sampling purposes. They have means of zeros and standard errors(s_stders)
     std_P = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
 
-    nPj = len(std_P); mean_P = [0]*nPj; probs= [1/nPj]*nPj; H = get_H(tau=0, U = Sg, R = Re);  
+    nPj = len(std_P); mean_P = [0]*nPj; probs= [1/nPj]*nPj; H = get_H(tau=0, U = Sg, R = Rn);  
     Pj = generate_Pj(means = mean_P, stders = std_P, cov = H, nstudy = n);
     
     ## generate sample X
     df_input = mixture_sampling(nsample = N, probs=probs, Pj=Pj)
     print( "Generating {len_X} stats.".format( len_X=N ) ); 
-    data = ims_parallelize(df_input, ims_estimate_statistics, cores, partitions, se, Sg, Re, n)
-    REG_X = data['stats'].tolist()
+    data = ims_parallelize(df_input, ims_estimate_statistics, cores, partitions, se, Sg, Rn, n)
+    vc_stats = data['stats'].tolist()
    
-    null_Re = Re; null_means = [0]*n; null_std = np.diag([1]*n);
-    null_cov = null_std.dot(null_Re).dot(null_std);
+    null_Rn = Rn; null_means = [0]*n; null_std = np.diag([1]*n);
+    null_cov = null_std.dot(null_Rn).dot(null_std);
 
     d_Q = multivariate_normal.pdf(x = df_input, mean = null_means, cov = null_cov);
     d_Pj = estim_prob_Pj (Pj, X = df_input);
@@ -189,7 +174,7 @@ def importance_sampling(N, Sg, Re, outfn, mp_cores):
 
     Palpha = vector_sum(const_mul(probs,d_Pj));
    
-    df_pvalue = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, REG_X, Palpha, probs, d_Q, d_Pj, nPj, N)
+    df_pvalue = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, vc_stats, Palpha, probs, d_Q, d_Pj, nPj, N)
     print('Completed estimating the inverse CDFs at different threshold values for DELPY\'s variance component model.'); 
     
     sorted_pvalue = df_pvalue.sort_index()
