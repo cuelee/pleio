@@ -163,7 +163,7 @@ if __name__ == '__main__':
         header += 'Call: \n';
         header += './xtractmats.py \\\n';
         options = ['--'+x.replace('_','-')+' '+str(opts[x])+' \\' for x in non_defaults];
-        header += '\n'.join(options).replace('True','').replace('Flase','');
+        header += '\n'.join(options).replace('True','').replace('False','');
         header = header[0:-1]+'\n';
 
         if args.sumstats is not None:

@@ -1,0 +1,24 @@
+************************************************************
+* Pair Wise LDSC (GetMatrices)
+* (C)2018 Cue H. Lee
+* Seoul National University
+************************************************************
+Call: 
+./sum2lib.pu \
+--gzip  \
+--sumstats ../data/C4D_CAD_DISCOVERY_METAANALYSIS_UPDATE.TXT \
+--prevs 0.03 \
+--ncase N_case \
+--ncont N_control \
+--signed-sumstats beta,0 \
+--se log_odds_se \
+--beta log_odds \
+--snp snp \
+--a1 other_allele \
+--a2 reference_allele \
+--delim t 
+
+Beginning analysis at Thu Jun 27 19:37:23 2019
+Read summary statistics from: ../data/C4D_CAD_DISCOVERY_METAANALYSIS_UPDATE.TXT
+Analysis finished at Thu Jun 27 19:37:24 2019
+Total time elapsed: 
