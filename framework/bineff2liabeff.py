@@ -30,21 +30,16 @@ def generate_liability_posterior_mean(F):
     return(ml_case, ml_cont)
 
 
-def search_cont_af(x, Ncase, Ncont, OR, V):
+def search_cont_af(x, OR, V):
     cont_af = x;
     case_af = ( OR * cont_af ) / ( (OR - 1) * cont_af +1 );
     
-    a = Ncase * (case_af * (1.0 - case_af) + case_af**2);
-    b = Ncont * (cont_af * (1.0 - cont_af) + cont_af**2);
-    c = Ncase * (1.0 - case_af) * (case_af + (1.0 - case_af));
-    d = Ncont * (1.0 - cont_af) * (cont_af + (1.0 - cont_af));
-    
-    estim_V = 0.5 * (1/a + 1/b + 1/c + 1/d);
+    estim_V = 1/cont_af + 1/(1-cont_af) + 1/(case_af) + 1/(1-case_af);
     return(V - estim_V)
 
 def root_finding(Ncase, Ncont, OR, V, i):
     try:
-        cont_af = root(f = search_cont_af, a = 0.001, b = 0.5, args = (Ncase, Ncont, OR, V*(1+i*0.01)));
+        cont_af = root(f = search_cont_af, a = 0.001, b = 0.5, args = (OR, V*(1+i*0.01)));
         return(cont_af)
     except:
         return(-1)
@@ -73,6 +68,8 @@ def bineff2liabeff(signed_val, se, Ncase, Ncont, Fp, signed_name = None, SNP = N
     if i > 100 and root_finding(Ncase,Ncont,OR,V,i) < 0 or V > 1:
         print('SNP: {id} has non realistic OR: {Or} and SE: {se} values /nReturn NA'.format(id = SNP, Or = OR, se = se))
         return('NA', 'NA')
+    if i > 0:
+        print('{i}:{snp}'.format(i=i, snp = SNP))
     case_af = OR * cont_af / (( OR - 1 ) * cont_af + 1);
     # smaf : sample maf
     sam_af = case_af * Fcc + cont_af * (1-Fcc);

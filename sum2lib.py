@@ -77,6 +77,10 @@ parser.add_argument('--a1', default='A1', type=str,
         help='Name of risk allele column (if not a name that delpy understands). NB: case insensitive.')
 parser.add_argument('--a2', default='A2', type=str,
         help='Name of reference allele column (if not a name that delpy understands). NB: case insensitive.')
+parser.add_argument('--palalle', default=False, action='store_true',
+	help='Use palallele computing.')
+parser.add_argument('--ncores', default=-1, type=int,
+	help='Number of cores for palalle computing. Default value is -1, indication of all CPU cores available.')
 parser.add_argument('--delim', default=' ', type=str,
         help='The delimiter of the summary statistics text file. The default value is \' \'')
 
@@ -135,8 +139,7 @@ def sum2lib_sub(df, prev, signed):
     df = pd.concat([df,applied_df], axis = 'columns')
     return(df)
 
-def parallelize (df_input, func, prev, signed):
-    cores = mp.cpu_count()
+def parallelize (df_input, func, prev, signed, cores):
     data_split = np.array_split(df_input, cores)
     iterable = product(data_split, [prev], [signed]);
     pool = mp.Pool(int(cores))
@@ -145,12 +148,24 @@ def parallelize (df_input, func, prev, signed):
     pool.join()
     return(df_output)
 
+def parse_paralle(args)
+    if args.palallele == True and args.ncores == -1:
+        cores = mp.cpu_count();
+    elif args.palallel == True:
+        cores = args.ncores;
+    elif args.palalle == False::
+        cores = 1;
+    else
+        raise ValueError('Cannot parse --ncores value. Check sum2lib.py -h for details');
+    return(cores)
+
 def sum2lib(input_dic, args, log):
     args.delim = parse_delim(args.delim);
     if len(args.signed_sumstats.split(',')) > 2:
         raise ValueError('The value of --signed-sumstats cannot be recognized. Check sum2lib.py -h for details.');
     args.signed_sumstats, signed = parse_signed_sumstats(args.signed_sumstats);
-    
+    cores = parse_paralle(args);  
+
     fs = list(input_dic.keys());
     for i in range(len(fs)):
         if os.path.exists(fs[i]):
@@ -161,7 +176,7 @@ def sum2lib(input_dic, args, log):
         df = pd.read_csv(fn, sep=args.delim, usecols = fn_col)
         df = df[[col[a] for a in fn_col]]
         df = df.set_index(df.columns[0])
-        df = parallelize(df, sum2lib_sub, prev, signed)
+        df = parallelize(df, sum2lib_sub, prev, signed, cores)
         df.columns = ['A1','A2','OLD_'+signed,'OLD_SE','Ncase','Ncont',signed,'SE']
         col=list(df.columns)
         df = df[ [col[a] for a in [0,1,6,7,4,5] ]]
