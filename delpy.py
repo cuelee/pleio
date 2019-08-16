@@ -224,7 +224,7 @@ def input_assembler(metainf, sgf, rnf):
         dmat = np.diag(1/np.sqrt(np.diag(smat)))
         cmat=dmat.dot(smat).dot(dmat)
         c_df = pd.DataFrame(cmat, index = include, columns = include)
-        n_w = (1-(abs(c_df).sum(axis=0)-1)/(c_df.shape[0]-1)).tolist()
+        n_w = abs(c_df).sum(axis=0)**(-1)
         return(n_w)
 
     metain_df = pd.read_csv(metainf, sep='\t', compression = 'gzip', index_col = ['SNP','A1','A2'])
