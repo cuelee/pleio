@@ -130,6 +130,7 @@ def write_mat(X,fname):
 
 def load_mat(fname):
     X = np.loadtxt(fname=fname);
+    print(X)
     return(X);
 
 def write_vec(l,fname):

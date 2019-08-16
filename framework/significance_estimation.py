@@ -71,7 +71,7 @@ def pvalue_estimation(cstat, iso):
         res = Decimal( str( interpolate.splev(cstat, iso.itck, der=0)));
     elif (cstat > iso.tck_lim):
         res = extrapolate_cue( cstat, iso.dtab );
-    return(float(res));
+    return(res);
 
 class pfun_estim(): 
     def __init__(self,isf):

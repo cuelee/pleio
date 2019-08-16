@@ -6,6 +6,10 @@ from scipy.optimize import minimize
 ## Sg = GenCor[nonNA_array];
 ## Se = RECor[nonNA_array];
 
+def is_pos_def(x):
+    eigs = np.linalg.eigvals(x)
+    return np.all(eigs > 0)
+
 def likelihood_mvn_tp (pars, x, Sg, Sn, n):
     tau = pars[0];
     vcg = tau * Sg;
@@ -15,9 +19,11 @@ def likelihood_mvn_tp (pars, x, Sg, Sn, n):
 
 def vc_optimization (b, se, Sg, Rn, n, bnds = [(0,200)]):
     Sn = np.diag(se).dot(Rn).dot(np.diag(se));
-    res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='SLSQP', bounds = bnds, args=(b, Sg, Sn, n), options = {'ftol' : 1e-9, 'disp':False});
+    res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='L-BFGS-B', bounds = bnds, args=(b, Sg, Sn, n), options = {'ftol' : 1e-9, 'disp':False});
     if (res.success != True):
-        print(res.success)
+        res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='L-BFGS-B', bounds = bnds, args=(b, Sg, Sn, n), options = {'ftol' : 1e-4, 'disp':False});
+        if (res.success != True):
+            print(res.message)
     tau = res.x[0];
     alt_var = -1 * res.fun;
     nul_var = multivariate_normal.logpdf( x = b, mean = [0]*n, cov = Sn);

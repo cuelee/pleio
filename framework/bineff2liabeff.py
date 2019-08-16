@@ -30,19 +30,33 @@ def generate_liability_posterior_mean(F):
     return(ml_case, ml_cont)
 
 
-def search_cont_af(x, OR, V):
+def search_cont_af(x, OR, V, Ncase, Ncont):
     cont_af = x;
     case_af = ( OR * cont_af ) / ( (OR - 1) * cont_af +1 );
+
+    a = Ncase * 2 * (case_af * (1.0 - case_af) + case_af**2);
+    b = Ncont * 2 * (cont_af * (1.0 - cont_af) + cont_af**2);
+    c = Ncase * 2 * (1.0 - case_af) * (case_af + (1.0 - case_af));
+    d = Ncont * 2 * (1.0 - cont_af) * (cont_af + (1.0 - cont_af));
     
-    estim_V = 1/cont_af + 1/(1-cont_af) + 1/(case_af) + 1/(1-case_af);
+    a,b,c,d = map(max, [ [i,1e-20] for i in [a,b,c,d] ])
+
+    estim_V = 1/a + 1/b + 1/c + 1/d;
     return(V - estim_V)
 
-def root_finding(Ncase, Ncont, OR, V, i):
-    try:
-        cont_af = root(f = search_cont_af, a = 0.001, b = 0.5, args = (OR, V*(1+i*0.01)));
-        return(cont_af)
-    except:
-        return(-1)
+
+def check_variance(af1, OR, N2, N1):
+    af2 = ( OR * af1 ) / ( (OR - 1) * af1 +1 );
+
+    a = N2 * 2 * (af2 * (1.0 - af2) + af2**2);
+    b = N1 * 2 * (af1 * (1.0 - af1) + af1**2);
+    c = N2 * 2 * (1.0 - af2) * (af2 + (1.0 - af2));
+    d = N1 * 2 * (1.0 - af1) * (af1 + (1.0 - af1));
+    
+    a,b,c,d = map(max, [ [i,1e-20] for i in [a,b,c,d] ])
+
+    V = 1/a + 1/b + 1/c + 1/d;
+    return(V)
 
 ## function binary effect estimates to liability scaled effect estimates 
 ## OR : odd ratio, var_OR : variance of OR, Ncase: number of cases, Ncont: number of controls, Fp: population prevalence 
@@ -56,21 +70,32 @@ def bineff2liabeff(signed_val, se, Ncase, Ncont, Fp, signed_name = None, SNP = N
         logOR = np.log(OR);
 
     V = se**2
+    if(se == 0 or Ncase == 0 or Ncont == 0):
+        print(signed_val, se, Ncase, Ncont, Fp, signed_name, SNP)
+        return(np.nan, np.nan)
     N = Ncase + Ncont;
     # Fcc: case control sample prevalence
     Fcc = Ncase/N;
     
     lib_case, lib_cont = generate_liability_posterior_mean(Fp);
-    i=0; cont_af = -1;
-    while(cont_af < 0 and i < 100):
-        cont_af = root_finding(Ncase,Ncont,OR,V,i)
-        i += 1;
-    if i > 100 and root_finding(Ncase,Ncont,OR,V,i) < 0 or V > 1:
-        print('SNP: {id} has non realistic OR: {Or} and SE: {se} values /nReturn NA'.format(id = SNP, Or = OR, se = se))
-        return('NA', 'NA')
-    if i > 0:
-        print('{i}:{snp}'.format(i=i, snp = SNP))
-    case_af = OR * cont_af / (( OR - 1 ) * cont_af + 1);
+    
+    V_min = check_variance(0.5, OR, Ncase, Ncont)
+    V_max = check_variance(0.00000001, OR, Ncase, Ncont)
+    if V_min > V:
+        cont_af = 0.5
+        case_af = OR * cont_af / (( OR - 1 ) * cont_af + 1);
+    elif V_max < V: 
+        print(signed_val, se, Ncase, Ncont, Fp, signed_name,SNP);
+        return(np.nan, np.nan)
+    else:
+        cont_af = root(f = search_cont_af, a = 0.00000001, b = 0.5, args = (OR, V, Ncase, Ncont));
+        case_af = OR * cont_af / (( OR - 1 ) * cont_af + 1);
+
+    if(cont_af > 1 or case_af > 1 or cont_af < 0 or case_af < 0):
+        print(signed_val, se, Ncase, Ncont, Fp, signed_name,SNP, cont_af, case_af);
+        raise ValueError('Convergence Error occurred: bineff2liabeff')
+    print(OR, se, V, Ncase, Ncont, Fp, cont_af, case_af)
+
     # smaf : sample maf
     sam_af = case_af * Fcc + cont_af * (1-Fcc);
     
@@ -93,7 +118,14 @@ def bineff2liabeff(signed_val, se, Ncase, Ncont, Fp, signed_name = None, SNP = N
                                 +   (lib_cont - alpha_estim - beta_estim * (0 - 2 * sam_af) / (2 * sam_af * (1 - sam_af)))**2 * (1 - cont_af)**2 * (1 - Fcc)
                                 +   (lib_cont - alpha_estim - beta_estim * (1 - 2 * sam_af) / (2 * sam_af * (1 - sam_af)))**2 * cont_af * (1 - cont_af) * (1 - Fcc)
                                 +   (lib_cont - alpha_estim - beta_estim * (2 - 2 * sam_af) / (2 * sam_af * (1 - sam_af)))**2 * cont_af**2 * (1 - Fcc)    )
-    
-    var_estim = np.sqrt(mean_squared_simul_err * N / (N - 2) / ((Ncase - 1) * var_std_case_X  + (Ncont - 1) * var_std_cont_X +  Ncase * Ncont / N * (mean_std_case_X - mean_std_cont_X)**2 ))
-    return(beta_estim, var_estim)
+  
+    if(mean_squared_simul_err < 0):
+            print(signed_val, se, Ncase, Ncont, Fp, signed_name,SNP, i);
+            raise ValueError('Found negative mean_squared_simul_err')
+    se_estim = np.sqrt(mean_squared_simul_err * N / (N - 2) / ((Ncase - 1) * var_std_case_X  + (Ncont - 1) * var_std_cont_X +  Ncase * Ncont / N * (mean_std_case_X - mean_std_cont_X)**2 ))
+    return(beta_estim, se_estim)
 
+#SNP         CHR BP          A1  A2  Z           P           N       BETA           SE          N_CASE          N_CONTROL       INFO
+#rs16945492  18  3839896     A   G   -0.35561    0.722133    361194  -8.05873e-05   0.000226617 1405.00371458   359788.996285   0.996052
+#rs111726894 18  71796714    G   T   -0.168595   0.866115    361194  -0.333912      1.98056     1405.0002171    359788.999783   0.902917
+#print(bineff2liabeff(signed_val=0.2129459, se=0.003527057, Ncase=200000, Ncont=1500000, Fp=0.03, signed_name = 'BETA', SNP = 'A'))

@@ -36,13 +36,6 @@ def mixture_sampling (nsample, probs, Pj):
         df = df.append(adf,ignore_index=True);
     return(df);
 
-def get_H (tau, U, R): 
-    return(tau * U + R );
-
-def get_Cov(stders, H):
-    cov=np.diag(stders).dot(H).dot(np.diag(stders));
-    return(cov);
-
 def h_t (ts,thres):
     return_vec = [0] * len(ts);
     for i in range(len(ts)):
@@ -135,7 +128,7 @@ def thres_parallelize(thres_vec, func, cores, vc_stats, Palpha, probs, d_Q, d_Pj
     return(res_list)
 
 ## GenCor and RECor: np.matrix, N: int, outfn: str
-def importance_sampling(N, Sg, Rn, outfn, mp_cores):
+def importance_sampling(N, se, Sg, Rn, outfn, mp_cores):
     
     ### set multi processing options 
     #mp.set_start_method('spawn')
@@ -148,18 +141,25 @@ def importance_sampling(N, Sg, Rn, outfn, mp_cores):
 
     output_filename = outfn;
     
-    n = nstudy = Sg.shape[0]; se=[1]*n;
+    n = nstudy = Sg.shape[0]; Sn = np.diag([1]*n).dot(Rn).dot(np.diag([1]*n))
    
     ## Deterministic importance sampling needs probability density functions for sampling purposes. They have means of zeros and standard errors(s_stders)
     std_P = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
 
-    nPj = len(std_P); mean_P = [0]*nPj; probs= [1/nPj]*nPj; H = get_H(tau=0, U = Sg, R = Rn);  
+    nPj = len(std_P); mean_P = [0]*nPj; probs= [1/nPj]*nPj; H = Sn;  
     Pj = generate_Pj(means = mean_P, stders = std_P, cov = H, nstudy = n);
     
     ## generate sample X
     df_input = mixture_sampling(nsample = N, probs=probs, Pj=Pj)
+    df_beta = df_input.copy()
+    df_beta.columns = ['T'+str(i) for i in range(len(se))]
+    for i in range(len(se)):
+        df_beta.loc[:,'T'+str(i)] *= se[i];
+
     print( "Generating {len_X} stats.".format( len_X=N ) ); 
-    data = ims_parallelize(df_input, ims_estimate_statistics, cores, partitions, se, Sg, Rn, n)
+    data = ims_parallelize(df_beta, ims_estimate_statistics, cores, partitions, se, Sg, Rn, n)
+    del df_beta;
+
     vc_stats = data['stats'].tolist()
    
     null_Rn = Rn; null_means = [0]*n; null_std = np.diag([1]*n);

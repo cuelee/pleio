@@ -163,47 +163,114 @@ def generate_mode_class_array_object(ssin, cain, log):
         raise
     return(meta_cain)
 
+def run_vc_optimizer(x, Sg, Rn, n):
+    b= [x[i*2] for i in range(n)];
+    se = [x[i*2+1] for i in range(n)];
+    return(vc_optimization(b, se, Sg, Rn, n))
 
-def cv_estimate_statistics(df_data, se, Sg, Rn, n): 
+def cv_estimate_statistics(df_data, Sg, Rn, n): 
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['stats'] =df_data.apply(lambda x: vc_optimization(x.tolist(), se, Sg, Rn, n), axis=1)
+    df_out['stats'] =df_data.apply(lambda x: run_vc_optimizer(x.tolist(), Sg, Rn, n), axis=1)
     return(df_out)
 
 def cv_parallelize(meta_cain, func, args): 
-    data_split = np.array_split(meta_cain.metain.head(100), args.ncores)
-    iterable = product(data_split, [[1]*meta_cain.n], [meta_cain.Sg.values], [meta_cain.Rn.values], [meta_cain.n])
+    data_split = np.array_split(meta_cain.metain, args.ncores)
+    iterable = product(data_split, [meta_cain.Sg.values], [meta_cain.Rn.values], [meta_cain.n])
     pool = mp.Pool(int(args.ncores))
     df_output = pd.concat(pool.starmap(func, iterable))
     pool.close()
     pool.join()
     return(df_output)
 
+def find_closed_PSD(x):
+    w, v = np.linalg.eig(x.values)
+    if (w>0).all():
+        return(x)
+    else: 
+        w_correct = [max(i,1e-6) for i in w]
+        rho = sum(w)/sum(w_correct)
+        s=v.dot(np.diag(w_correct)).dot(np.transpose(v))
+        x = pd.DataFrame((s+np.transpose(s))/2,index = x.index, columns = x.columns, copy = True  )
+        return(x); 
+
+def is_pos_def(x):
+    eigs = np.linalg.eigvals(x) 
+    return np.all(eigs > 0)
+
+def input_assembler(metainf, sgf, rnf):
+    class meta_class_array_object_generator(object):
+        def __init__(self, metain_df, sg_df, rn_df, mean_se, tlist):
+            self.metain = metain_df;
+            self.Sg = sg_df;
+            self.Rn = rn_df;
+            self.mean_se = mean_se;
+            self.n = len(tlist);
+
+    def read_mat(fn, LIST):
+        df=pd.read_csv(fn,sep='\t'); 
+        df.index = df.columns 
+        df = df.loc[LIST,LIST]
+        if not is_pos_def(df):
+            df = find_closed_PSD(df)
+        return(df)
+
+    def gen_N(x,n_w):
+        n = [1/(i**2) for i in x]; l=len(n);
+        nom = [n[i]*n_w[i] for i in range(l)]
+        return(sum(nom))
+
+    def get_Nw(sg_df,include):
+        smat = sg_df.to_numpy()
+        dmat = np.diag(1/np.sqrt(np.diag(smat)))
+        cmat=dmat.dot(smat).dot(dmat)
+        c_df = pd.DataFrame(cmat, index = include, columns = include)
+        n_w = (1-(abs(c_df).sum(axis=0)-1)/(c_df.shape[0]-1)).tolist()
+        return(n_w)
+
+    metain_df = pd.read_csv(metainf, sep='\t', compression = 'gzip', index_col = ['SNP','A1','A2'])
+    col = metain_df.columns.tolist()
+    include = [col[i].split('_beta')[0] for i in range(len(col)) if i % 2 == 0]
+    mean_se = metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]].mean(axis = 0)
+    rn_df=read_mat(rnf,include);
+    sg_df=read_mat(sgf,include);
+    n_w = get_Nw(sg_df,include)
+    metain_df['N'] = metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]].apply(lambda x: gen_N(x.tolist(),n_w), axis = 1)
+    metain_df.set_index('N',append = True, inplace=True)
+    meta_cain = meta_class_array_object_generator(metain_df, sg_df, rn_df, mean_se, include)
+    return(meta_cain)
 
 def delpy(args,log):
 
    ### Read inputs as a class_array_object 
-    ssin = setup_input_files(args ,log);
-    cain = generate_input_class_array_object(ssin,log);
-    log.log('Read {} Summary statistics from the summary statistics directory '.format(len(cain)));
-    #log.log('Read {} Summary statistics'.format(len(cain)));
-    meta_cain = generate_mode_class_array_object(ssin, cain, log);
-
-    outdir = args.out; ensure_dir(outdir);
-    importance_sampling_fn = 'isf.txt';
-    is_path = os.path.join(outdir,importance_sampling_fn); 
+    if args.sumstats is not None:
+        ssin = setup_input_files(args ,log);
+        cain = generate_input_class_array_object(ssin,log);
+        log.log('Read {} Summary statistics from the summary statistics directory '.format(len(cain)));
+        #log.log('Read {} Summary statistics'.format(len(cain)));
+        meta_cain = generate_mode_class_array_object(ssin, cain, log);
         
+        imsa_Sg = meta_cain.Sg;imsa_Rn=meta_cain.Rn;
+        del ssin, cain
+    
+    if args.metain is not None:
+        meta_cain = input_assembler(args.metain, args.sg, args.rn)
+        imsa_Sg = meta_cain.Sg.values;imsa_Rn=meta_cain.Rn.values;imsa_se=meta_cain.mean_se;
+
     if args.create:
-        imsa(N = ssin.default_nis ,Sg = meta_cain.Sg, Rn = meta_cain.Rn, outfn = is_path, mp_cores = args.ncores);
-        iso = pfun_estim(is_path);
+        imsa_N = args.nis
+        importance_sampling_fn = 'isf.txt';
+        outdir = args.out; ensure_dir(outdir);
+        imsa_path = os.path.join(outdir,importance_sampling_fn); 
+        imsa(N = imsa_N, se = imsa_se ,Sg = imsa_Sg, Rn = imsa_Rn, outfn = imsa_path, mp_cores = args.ncores);
+        iso = pfun_estim(imsa_path);
     else:
         quit('The feature has not been supported yet');
-   
-    del ssin, cain
+    
     summary = cv_parallelize(meta_cain, cv_estimate_statistics, args);
     summary['Pvalue'] = summary.apply(lambda x: pvalue_estimation(x['stats'], iso), axis=1);
     
     out_path = os.path.join(outdir+'.delpy.sum.gz');
-    summary.to_csv(out_path, index = False, sep='\t', compression='gzip');
+    summary.to_csv(out_path, index = True, sep='\t', compression='gzip');
 
     quit('work done')
 
@@ -215,6 +282,12 @@ parser.add_argument('--out', default='out',type=str,
 # Besic Random Effect Meta-analysis Flags
 parser.add_argument('--sumstats', default=None, type=str,
     help='input folder path: path to summary statistics data.')
+parser.add_argument('--metain', default=None, type=str,
+    help='input file: file prefix of the meta input data.')
+parser.add_argument('--sg', default=None, type=str,
+    help='input file: file prefix of the genetic covariance matrix.')
+parser.add_argument('--rn', default=None, type=str,
+    help='input file: file prefix of the non-genetic correlation matrix.')
 parser.add_argument('--test', default=None, type=str,
     help='comma separated sumstats filename: Use the same file name from ./{sumstats}/_out_/sumstats.list ')
 parser.add_argument('--all', default=False, action='store_true',
@@ -257,13 +330,15 @@ if __name__ == '__main__':
         start_time = time.time()
 
         if args.all is not False or args.test is not None:
-            if args.sumstats is None:
+            if args.sumstats is None and args.metain is None:
                 raise ValueError('--sumstats should be defined')
+            if args.metain is not None and args.sg is None or args.rn is None:
+                raise ValueError('--metain need --sg and --rn flags to be defined')
             if args.create is not True and args.isf is None:
                 raise ValueError('--create or --isf flag should be defined') 
             if (args.parallel == False):
                 args.ncores = 1;
-
+            
             delpy(args,log)
 
         else:
