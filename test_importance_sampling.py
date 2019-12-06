@@ -1,5 +1,5 @@
 from framework.importance_sampling import importance_sampling as run_is
-from framework.significance_estimation import pfun_estim, pestim
+from framework.significance_estimation import pfun_estim, pvalue_estimation
 import time
 import numpy as np
 
@@ -18,14 +18,24 @@ def sec_to_str(t):
 print('Beginning analysis at {T}'.format(T=time.ctime()));
 start_time = time.time()
 
-cov = np.diag([1]*7)
-mean = np.array([1]*7)
+n = 100 
+rg = np.matrix([[0.8]*n]*n) 
+for i in range(n):
+    rg[i,i] = 1.0 
+re = np.diag([1.0] * n)
 
-run_is(N=10000, Sg = cov, Re = cov, outfn = './isf.isf', mp_cores = 5)
+h2 = np.array([ np.random.uniform(0,0.4,1)[0] for i in range(n)])
+print(h2)
+sg = np.diag(np.sqrt(h2)).dot(rg).dot(np.diag(np.sqrt(h2)))
+#print(rg, re, sg)
+ccov = sg+re
+
+
+run_is(N=10000, se = [1.0]*n, Sg = sg, Rn = re, outfn = './isf.isf', mp_cores = 1)
 iso=pfun_estim('./isf.isf')
 
 for i in range(100):
-    print(pestim(i,iso))
+    print(pvalue_estimation(i,iso))
 
 time_elapsed = round(time.time()-start_time,2)
 print('Total time elapsed: {T}'.format(T=sec_to_str(time_elapsed)))

@@ -151,13 +151,13 @@ def importance_sampling(N, se, Sg, Rn, outfn, mp_cores):
     
     ## generate sample X
     df_input = mixture_sampling(nsample = N, probs=probs, Pj=Pj)
-    df_beta = df_input.copy()
-    df_beta.columns = ['T'+str(i) for i in range(len(se))]
-    for i in range(len(se)):
-        df_beta.loc[:,'T'+str(i)] *= se[i];
-
+    #df_beta = df_input.copy()
+    #df_beta.columns = ['T'+str(i) for i in range(len(se))]
+    #for i in range(len(se)):
+    #    df_beta.loc[:,'T'+str(i)] *= se[i];
+    #
     print( "Generating {len_X} stats.".format( len_X=N ) ); 
-    data = ims_parallelize(df_beta, ims_estimate_statistics, cores, partitions, se, Sg, Rn, n)
+    data = ims_parallelize(df_input, ims_estimate_statistics, cores, partitions, se, Sg, Rn, n)
     del df_beta;
 
     vc_stats = data['stats'].tolist()

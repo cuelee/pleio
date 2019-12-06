@@ -15,13 +15,13 @@ def likelihood_mvn_tp (pars, x, Sg, Sn, n):
     vcg = tau * Sg;
     vc = vcg + Sn;
     k = multivariate_normal.logpdf(x = x, mean = [0] * n, cov = vc);
-    return(-1 * k);
+    return(-1 * k );
 
 def vc_optimization (b, se, Sg, Rn, n, bnds = [(0,200)]):
     Sn = np.diag(se).dot(Rn).dot(np.diag(se));
     res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='L-BFGS-B', bounds = bnds, args=(b, Sg, Sn, n), options = {'ftol' : 1e-9, 'disp':False});
     if (res.success != True):
-        res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='L-BFGS-B', bounds = bnds, args=(b, Sg, Sn, n), options = {'ftol' : 1e-4, 'disp':False});
+        res = minimize(likelihood_mvn_tp, x0 = np.random.uniform(0.001,.2,1), method ='L-BFGS-B', bounds = bnds, args=(b, Sg, Sn, n), options = {'ftol' : 1e-6, 'disp':False, 'eps' : 1e-30 });
         if (res.success != True):
             print(res.message)
     tau = res.x[0];

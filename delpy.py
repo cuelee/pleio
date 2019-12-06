@@ -168,9 +168,15 @@ def run_vc_optimizer(x, Sg, Rn, n):
     se = [x[i*2+1] for i in range(n)];
     return(vc_optimization(b, se, Sg, Rn, n))
 
+def LS_input_parser(x, Rn):
+    b= [x[i*2] for i in range(n)];
+    se = [x[i*2+1] for i in range(n)];
+    return(LS(b, se, Rn))
+
 def cv_estimate_statistics(df_data, Sg, Rn, n): 
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['stats'] =df_data.apply(lambda x: run_vc_optimizer(x.tolist(), Sg, Rn, n), axis=1)
+    df_out['DELPY_stat'] =df_data.apply(lambda x: run_vc_optimizer(x.tolist(), Sg, Rn, n), axis=1)
+    df_out['LS_stat'] =df_data.apply(lambda x: LS_input_parser(x.tolist(), Rn), axis=1)
     return(df_out)
 
 def cv_parallelize(meta_cain, func, args): 
@@ -212,6 +218,7 @@ def input_assembler(metainf, sgf, rnf):
         df = df.loc[LIST,LIST]
         if not is_pos_def(df):
             df = find_closed_PSD(df)
+            df = df + np.diag([1e-6]*df.shape[0])
         return(df)
 
     def gen_N(x,n_w):
@@ -267,7 +274,7 @@ def delpy(args,log):
         quit('The feature has not been supported yet');
     
     summary = cv_parallelize(meta_cain, cv_estimate_statistics, args);
-    summary['Pvalue'] = summary.apply(lambda x: pvalue_estimation(x['stats'], iso), axis=1);
+    summary['DELPY_p'] = summary.apply(lambda x: pvalue_estimation(x['DELPY_stat'], iso), axis=1);
     
     out_path = os.path.join(outdir+'.delpy.sum.gz');
     summary.to_csv(out_path, index = True, sep='\t', compression='gzip');
@@ -321,7 +328,7 @@ if __name__ == '__main__':
         non_defaults = [x for x in opts.keys() if opts[x] != defaults[x]];
         header = MASTHEAD;
         header += 'Call: \n';
-        header += './reg.py \\\n';
+        header += './delpy.py \\\n';
         options = ['--'+x.replace('_','-')+' '+str(opts[x])+' \\' for x in non_defaults];
         header += '\n'.join(options).replace('True','').replace('False','');
         header = header[0:-1]+'\n';

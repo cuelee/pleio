@@ -29,7 +29,7 @@ def LS(betas, stders, cor):
     newstd = np.sqrt(newv)
     z = newx/newstd
 
-    return(round(z,6)) 
+    return(z) 
 
 def LS_apply(LS_chi, U, R, n, X, row_wise):
     if(row_wise == True):
