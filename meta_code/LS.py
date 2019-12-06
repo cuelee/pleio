@@ -1,4 +1,5 @@
-import numpy as np
+import numpy as n
+from scipy.stats import chi2
 
 def LS_chi(betas, stders, cor):
 	bes = list(map(float,betas))
@@ -30,6 +31,10 @@ def LS(betas, stders, cor):
     z = newx/newstd
 
     return(z) 
+
+def LS_p(z):
+    return(chi2.sf(z**2, df = 1, loc = 0, scale = 1))
+
 
 def LS_apply(LS_chi, U, R, n, X, row_wise):
     if(row_wise == True):

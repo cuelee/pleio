@@ -10,7 +10,7 @@ REG is a command line tool for performing cross-disease meta-analysis
 from framework.parse import *
 from framework.importance_sampling import importance_sampling as imsa
 from framework.significance_estimation import pfun_estim, pvalue_estimation
-from meta_code.variance_component import vc_optimization 
+from meta_code.variance_component import vc_optimization, LS, LS_p 
 import numpy as np
 import pandas as pd
 import os, sys, traceback, argparse, time
@@ -275,6 +275,7 @@ def delpy(args,log):
     
     summary = cv_parallelize(meta_cain, cv_estimate_statistics, args);
     summary['DELPY_p'] = summary.apply(lambda x: pvalue_estimation(x['DELPY_stat'], iso), axis=1);
+    summary['LS_p'] = summary.apply(lambda x: (x['LS_stat'], ), axis=1);
     
     out_path = os.path.join(outdir+'.delpy.sum.gz');
     summary.to_csv(out_path, index = True, sep='\t', compression='gzip');
