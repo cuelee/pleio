@@ -24,18 +24,19 @@ for i in range(n):
     rg[i,i] = 1.0 
 re = np.diag([1.0] * n)
 
-h2 = np.array([ np.random.uniform(0,0.4,1)[0] for i in range(n)])
-print(h2)
+#h2 = np.array([ np.random.uniform(0,0.4,1)[0] for i in range(n)])
+h2 = [1]*n
+#print(h2)
 sg = np.diag(np.sqrt(h2)).dot(rg).dot(np.diag(np.sqrt(h2)))
 #print(rg, re, sg)
 ccov = sg+re
 
 
-run_is(N=10000, se = [1.0]*n, Sg = sg, Rn = re, outfn = './isf.isf', mp_cores = 1)
+run_is(N=100, Sg = sg, Re = re, outfn = './isf.isf', mp_cores = 5)
 iso=pfun_estim('./isf.isf')
 
-for i in range(100):
-    print(pvalue_estimation(i,iso))
+#for i in range(100):
+#    print(pvalue_estimation(i,iso))
 
 time_elapsed = round(time.time()-start_time,2)
 print('Total time elapsed: {T}'.format(T=sec_to_str(time_elapsed)))

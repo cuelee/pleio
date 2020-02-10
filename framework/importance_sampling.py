@@ -7,14 +7,33 @@
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
+import random
 from itertools import product
 from decimal import *
 from scipy.stats import multivariate_normal
-from scipy.optimize import minimize
-from meta_code.variance_component import vc_optimization
+from meta_code.variance_component import vcm_optimization
 from meta_code.LS import LS_chi, LS_apply
 
 #os.path.basename(__file__);
+
+
+def generate_P(means, stders, Re, n, nPj):
+    '''
+    P is the list contains 
+    '''
+
+    class Pj(object):
+        '''
+        Pj is a sampling density function of the deterministic importance sampling procedure 
+        The class define the covariance matrix and means of Pj
+        '''
+        def __init__(self, mean, cov):
+            self.means = [mean] * cov.shape[0];
+            self.cov = cov;
+            self.pdf = None;
+
+    P = [Pj(means[i], np.diag( [stders[i]] * n ).dot( Re ).dot( np.diag([stders[i]] * n) )) for i in range(nPj) ];
+    return(P) 
 
 ### These definitions are necessary to estimate sample probability density functions for deterministic IS 
 def generate_Pj (means, stders, cov, nstudy):
@@ -26,15 +45,16 @@ def generate_Pj (means, stders, cov, nstudy):
     return(Pj_list);
 
 ### sampling from mixture densities
-def mixture_sampling (nsample, probs, Pj):
-    nP = len(probs); choices = [i for i in range(nP)]; N = nsample; count = [0] * nP; df = pd.DataFrame();
-    comp = np.random.choice(choices, N, replace = True, p = probs);
+def mixture_sampling (nsample, alpha, P):
+    J = len(alpha); choices = [i for i in range(J)]; N = nsample; count = [0] * J; input_df = pd.DataFrame();
+    comp = np.random.choice(choices, N, replace = True, p = alpha);
     for i in range(len(comp)): count[comp[i]] += 1;
-    for i in range(nP):
-        cmean = Pj[0][i]; ccov = Pj[1][i]; cN = count[i];
-        adf = pd.DataFrame(np.random.multivariate_normal(mean = cmean, cov = ccov, size = cN));
-        df = df.append(adf,ignore_index=True);
-    return(df);
+    for j in range(J):
+        Pj_mean = P[j].means; Pj_cov = P[j].cov; Pj_N = count[j];
+        Pj_df = pd.DataFrame(np.random.multivariate_normal(mean = Pj_mean, cov = Pj_cov, size = Pj_N));
+        P[j].pdf = Pj_df
+        input_df = input_df.append(Pj_df,ignore_index=True);
+    return(input_df);
 
 def h_t (ts,thres):
     return_vec = [0] * len(ts);
@@ -43,14 +63,14 @@ def h_t (ts,thres):
             return_vec[i] = 1;
     return(return_vec);
 
-def estim_prob_Pj (Pj, X):
-    nPj = len(Pj[0]); pdf_Pj = [];
-    for i in range(nPj):
-        cmean = Pj[0][i];
-        ccov = Pj[1][i];
-        cpdf = multivariate_normal.pdf(x = X, mean = cmean, cov = ccov);
-        pdf_Pj.append(np.array(cpdf));
-    return(pdf_Pj);
+def P_density_estimation (P, input_df):
+    nP = len(P); pdf_P = [];
+    for i in range(nP):
+        Pj_mean = P[i].means;
+        Pj_cov = P[i].cov;
+        Pj_pdf = multivariate_normal.pdf( x = input_df, mean = Pj_mean, cov = Pj_cov );
+        pdf_P.append( np.array( Pj_pdf ) );
+    return( pdf_P );
 
 ### These definitions are necessary for estimating I 
 def const_mul(array, pdf_Pj):
@@ -90,37 +110,36 @@ def svd_inv(cov_t):
     inv_cov_t = vs.dot(ds).dot(np.transpose(us));
     return(inv_cov_t)
 
-def ims_estimate_statistics(df_data, se, Sg, Rn, n):
+def ims_estimate_statistics(df_data, se, Sg, Re, n):
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['stats'] =df_data.apply(lambda x: vc_optimization(x.tolist(), se, Sg, Rn, n), axis=1)
+    df_out['LL_RTS'] = df_data.apply(lambda x: vcm_optimization(x.tolist(), se, Sg, Re, n), axis=1)
     return(df_out)
 
-def ims_parallelize(df_input, func, cores, partitions, se, Sg, Rn, n):
+def ims_parallelize(df_input, func, cores, partitions, se, Sg, Re, n):
     data_split = np.array_split(df_input, partitions)
-    iterable = product(data_split, [se], [Sg], [Rn], [n])
+    iterable = product(data_split, [se], [Sg], [Re], [n])
     pool = mp.Pool(int(cores))
     df_output = pd.concat(pool.starmap(func, iterable))
     pool.close()
     pool.join()
     return(df_output)
 
-
-def thres_estimate_pvalue(thres, vc_stats, Palpha, probs, d_Q, d_Pj, nPj, N):
-    h_reg = h_t(ts = vc_stats, thres = thres);
-    m_reg = [h_reg[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
-    cov_tm_reg = estim_cov_tm(d_Pj, m_reg); 
-    cov_t = estim_cov_t(d_Pj, Palpha);
+def thres_estimate_pvalue(thres, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
+    h = h_t(ts = Sdelpy, thres = thres);
+    m = [h[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
+    cov_tm = estim_cov_tm(d_P, m); 
+    cov_t = estim_cov_t(d_P, Palpha);
     inv_cov_t = svd_inv(cov_t);
-    denominator = vector_sum(const_mul(probs, d_Pj));
-    betas_reg = [inv_cov_t.dot(cov_tm_reg)[0,i] for i in range(nPj)];
-    control_variate_reg = vector_sum(const_mul(betas_reg, d_Pj));
-    nominator_reg = [ h_reg[i] * d_Q[i] - control_variate_reg[i] for i in range(len(d_Q)) ];
-    res = sum( nominator_reg[i] / denominator[i] for i in range(len(d_Q))) /N + np.sum(betas_reg);
-    return(pd.DataFrame([res], columns = ['pvalue'], index = [thres]))
+    denominator = vector_sum(const_mul(alpha, d_P));
+    betas = [inv_cov_t.dot(cov_tm)[0,i] for i in range( nPj )];
+    control_variate = vector_sum(const_mul(betas, d_P));
+    nominator = [ h[i] * d_Q[i] - control_variate[i] for i in range(len( d_Q )) ];
+    IS_estim = sum( nominator[i] / denominator[i] for i in range(len( d_Q ))) /N + np.sum( betas );
+    return(pd.DataFrame([IS_estim], columns = ['pvalue'], index = [thres]))
 
 
-def thres_parallelize(thres_vec, func, cores, vc_stats, Palpha, probs, d_Q, d_Pj, nPj, N):
-    iterable = product(thres_vec, [vc_stats], [Palpha], [probs], [d_Q], [d_Pj], [nPj], [N])
+def thres_parallelize(thres_vec, func, cores, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
+    iterable = product(thres_vec, [Sdelpy], [Palpha], [alpha], [d_Q], [d_P], [nPj], [N])
     pool = mp.Pool(int(cores))
     res_list = pd.concat(pool.starmap(func, iterable))
     pool.close()
@@ -128,7 +147,8 @@ def thres_parallelize(thres_vec, func, cores, vc_stats, Palpha, probs, d_Q, d_Pj
     return(res_list)
 
 ## GenCor and RECor: np.matrix, N: int, outfn: str
-def importance_sampling(N, se, Sg, Rn, outfn, mp_cores):
+def importance_sampling(N, Sg, Re, outfn, mp_cores):
+    np.random.seed(1)
     
     ### set multi processing options 
     #mp.set_start_method('spawn')
@@ -140,44 +160,36 @@ def importance_sampling(N, se, Sg, Rn, outfn, mp_cores):
         partitions = cores;
 
     output_filename = outfn;
-    
-    n = nstudy = Sg.shape[0]; Sn = np.diag([1]*n).dot(Rn).dot(np.diag([1]*n))
+   
+    nstudy = Sg.shape[0]; n = nstudy; Se = np.diag([1]*n).dot(Re).dot(np.diag([1]*n)); se = [1] * n;
    
     ## Deterministic importance sampling needs probability density functions for sampling purposes. They have means of zeros and standard errors(s_stders)
-    std_P = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
+    c_Pj = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
 
-    nPj = len(std_P); mean_P = [0]*nPj; probs= [1/nPj]*nPj; H = Sn;  
-    Pj = generate_Pj(means = mean_P, stders = std_P, cov = H, nstudy = n);
+    nPj = len(c_Pj); mean_P = [0] * nPj; alpha= [1 / nPj] * nPj; H = Se;  
+    P = generate_P(means = [0] * nPj, stders = c_Pj, Re = Re, n = n, nPj = nPj)
+    #Pj = generate_Pj(means = mean_P, stders = c_Pj, cov = H, nstudy = n);
     
     ## generate sample X
-    df_input = mixture_sampling(nsample = N, probs=probs, Pj=Pj)
-    #df_beta = df_input.copy()
-    #df_beta.columns = ['T'+str(i) for i in range(len(se))]
-    #for i in range(len(se)):
-    #    df_beta.loc[:,'T'+str(i)] *= se[i];
-    #
+    input_df = mixture_sampling ( nsample = N, alpha = alpha, P = P )
     print( "Generating {len_X} stats.".format( len_X=N ) ); 
-    data = ims_parallelize(df_input, ims_estimate_statistics, cores, partitions, se, Sg, Rn, n)
-    del df_beta;
+    data = ims_parallelize( input_df, ims_estimate_statistics, cores, partitions, se, Sg, Re, n )
+    Sdelpy = data['LL_RTS'].tolist()
 
-    vc_stats = data['stats'].tolist()
-   
-    null_Rn = Rn; null_means = [0]*n; null_std = np.diag([1]*n);
-    null_cov = null_std.dot(null_Rn).dot(null_std);
+    null_means = [0] * n;   null_cov = Se;
 
-    d_Q = multivariate_normal.pdf(x = df_input, mean = null_means, cov = null_cov);
-    d_Pj = estim_prob_Pj (Pj, X = df_input);
+    d_Q = multivariate_normal.pdf( x = input_df, mean = null_means, cov = null_cov );
+    d_P = P_density_estimation( P = P, input_df = input_df );
    
     ### It is recommended to get tabulated pdf at 0.1, 0.2, 0.3 ... 1.0, 2.0, 3.0,.... 31.0.  
-    thres_vec = [ float(i)/10 for i in range(10) ] + [ float(i+1) for i in range(40) ]; ntest = len(thres_vec);
-    pvalue_estim = pd.DataFrame(index = thres_vec);
+    thres_vec = [ float(i) / 10 for i in range(10) ] + [ float(i+1) for i in range(40) ];
 
-    Palpha = vector_sum(const_mul(probs,d_Pj));
+    Palpha = vector_sum(const_mul(alpha,d_P));
    
-    df_pvalue = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, vc_stats, Palpha, probs, d_Q, d_Pj, nPj, N)
-    print('Completed estimating the inverse CDFs at different threshold values for DELPY\'s variance component model.'); 
+    pvalue_df = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N)
+    print('Completed estimating the inverse CDFs at different threshold values for PLEIO\'s variance component model.'); 
     
-    sorted_pvalue = df_pvalue.sort_index()
+    sorted_pvalue = pvalue_df.sort_index()
     print(sorted_pvalue)
     sorted_pvalue.to_csv(output_filename, header = False, index = True, sep = " ")
     print('Wrote tabulated inverse cdf');

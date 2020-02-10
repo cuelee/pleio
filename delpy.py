@@ -10,7 +10,8 @@ REG is a command line tool for performing cross-disease meta-analysis
 from framework.parse import *
 from framework.importance_sampling import importance_sampling as imsa
 from framework.significance_estimation import pfun_estim, pvalue_estimation
-from meta_code.variance_component import vc_optimization, LS, LS_p 
+from meta_code.variance_component import vc_optimization
+from meta_code.LS import LS, LS_p 
 import numpy as np
 import pandas as pd
 import os, sys, traceback, argparse, time
@@ -168,7 +169,7 @@ def run_vc_optimizer(x, Sg, Rn, n):
     se = [x[i*2+1] for i in range(n)];
     return(vc_optimization(b, se, Sg, Rn, n))
 
-def LS_input_parser(x, Rn):
+def LS_input_parser(x, Rn, n):
     b= [x[i*2] for i in range(n)];
     se = [x[i*2+1] for i in range(n)];
     return(LS(b, se, Rn))
@@ -176,7 +177,7 @@ def LS_input_parser(x, Rn):
 def cv_estimate_statistics(df_data, Sg, Rn, n): 
     df_out = pd.DataFrame(index = df_data.index)
     df_out['DELPY_stat'] =df_data.apply(lambda x: run_vc_optimizer(x.tolist(), Sg, Rn, n), axis=1)
-    df_out['LS_stat'] =df_data.apply(lambda x: LS_input_parser(x.tolist(), Rn), axis=1)
+    df_out['LS_stat'] =df_data.apply(lambda x: LS_input_parser(x.tolist(), Rn, n), axis=1)
     return(df_out)
 
 def cv_parallelize(meta_cain, func, args): 

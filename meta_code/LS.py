@@ -1,4 +1,4 @@
-import numpy as n
+import numpy as np
 from scipy.stats import chi2
 
 def LS_chi(betas, stders, cor):
