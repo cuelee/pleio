@@ -10,7 +10,7 @@ REG is a command line tool for performing cross-disease meta-analysis
 from framework.parse import *
 from framework.importance_sampling import importance_sampling as imsa
 from framework.significance_estimation import pfun_estim, pvalue_estimation
-from meta_code.variance_component import vc_optimization
+from meta_code.variance_component import vcm_optimization
 from meta_code.LS import LS, LS_p 
 import numpy as np
 import pandas as pd
@@ -235,7 +235,7 @@ def input_assembler(metainf, sgf, rnf):
         n_w = abs(c_df).sum(axis=0)**(-1)
         return(n_w)
 
-    metain_df = pd.read_csv(metainf, sep='\t', compression = 'gzip', index_col = ['SNP','A1','A2'])
+    metain_df = pd.read_csv(metainf, sep='\t', compression = 'gzip', index_col = ['SNP','A1','A2'], nrows = 100)
     col = metain_df.columns.tolist()
     include = [col[i].split('_beta')[0] for i in range(len(col)) if i % 2 == 0]
     mean_se = metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]].mean(axis = 0)
@@ -257,19 +257,19 @@ def delpy(args,log):
         #log.log('Read {} Summary statistics'.format(len(cain)));
         meta_cain = generate_mode_class_array_object(ssin, cain, log);
         
-        imsa_Sg = meta_cain.Sg;imsa_Rn=meta_cain.Rn;
+        imsa_Sg = meta_cain.Sg;imsa_Re=meta_cain.Rn;
         del ssin, cain
     
     if args.metain is not None:
         meta_cain = input_assembler(args.metain, args.sg, args.rn)
-        imsa_Sg = meta_cain.Sg.values;imsa_Rn=meta_cain.Rn.values;imsa_se=meta_cain.mean_se;
+        imsa_Sg = meta_cain.Sg.values;imsa_Re=meta_cain.Rn.values;imsa_se=meta_cain.mean_se;
 
     if args.create:
         imsa_N = args.nis
         importance_sampling_fn = 'isf.txt';
         outdir = args.out; ensure_dir(outdir);
         imsa_path = os.path.join(outdir,importance_sampling_fn); 
-        imsa(N = imsa_N, se = imsa_se ,Sg = imsa_Sg, Rn = imsa_Rn, outfn = imsa_path, mp_cores = args.ncores);
+        imsa(N = imsa_N, Sg = imsa_Sg, Re = imsa_Re, outfn = imsa_path, mp_cores = args.ncores);
         iso = pfun_estim(imsa_path);
     else:
         quit('The feature has not been supported yet');
