@@ -175,21 +175,21 @@ def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
         res=vh[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
     return(res)
 
-def run_vc_optimizer(x, Ut, Ct):
+nef run_vc_optimizer(x, Ut, Ct):
     b = np.array([x[i*2] for i in range(n)]);
     se = np.array([x[i*2+1] for i in range(n)]);
-    h = Ut.dot(x)
+    h = Ut.dot(b)
     K = np.diag(se).dot(Ct).dot(np.diag(se))
     return(vcm_optimization(h, K))
 
-def LS_input_parser(x, Rn, n):
+def LS_input_parser(x, Ce, n):
     b= [x[i*2] for i in range(n)];
     se = [x[i*2+1] for i in range(n)];
-    return(LS(b, se, Rn))
+    return(LS(b, se, Ce))
 
 def _estimate_statistics(df_data, Sg, Ce):
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
-    trans_ce = Uinv_sqrt.dot(Ce).dot(Uinv_sqrt)
+    trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
     df_out = pd.DataFrame(index = df_data.index)
     df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, trans_ce), axis=1)
     df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, n), axis=1)
@@ -219,7 +219,7 @@ def is_pos_def(x):
     eigs = np.linalg.eigvals(x) 
     return np.all(eigs > 0)
 
-def read_metain(metainf, sgf, rnf):
+def read_metain(metainf, sgf, cef):
     class meta_class_array_object_generator(object):
         def __init__(self, metain_df, sg_df, ce_df, N_gwas, tlist):
             self.metain = metain_df;
@@ -264,8 +264,8 @@ def delpy(args,log):
         importance_sampling_fn = 'isf.txt';
         outdir = args.out; ensure_dir(outdir);
         importance_sampling_f = os.path.join(outdir,importance_sampling_fn); 
-        importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain_Ce, importance_sampling_f, args.ncores);
-        iso = pfun_estim(imsa_path);
+        importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, importance_sampling_f, args.ncores);
+        iso = pfun_estim(importance_sampling_f);
     else:
         quit('The feature has not been supported yet');
     
@@ -290,7 +290,7 @@ parser.add_argument('--metain', default=None, type=str,
     help='input file: file prefix of the meta input data.')
 parser.add_argument('--sg', default=None, type=str,
     help='input file: file prefix of the genetic covariance matrix.')
-parser.add_argument('--rn', default=None, type=str,
+parser.add_argument('--ce', default=None, type=str,
     help='input file: file prefix of the non-genetic correlation matrix.')
 parser.add_argument('--test', default=None, type=str,
     help='comma separated sumstats filename: Use the same file name from ./{sumstats}/_out_/sumstats.list ')
@@ -336,8 +336,8 @@ if __name__ == '__main__':
         if args.all is not False or args.test is not None:
             if args.sumstats is None and args.metain is None:
                 raise ValueError('--sumstats should be defined')
-            if args.metain is not None and args.sg is None or args.rn is None:
-                raise ValueError('--metain need --sg and --rn flags to be defined')
+            if args.metain is not None and args.sg is None or args.ce is None:
+                raise ValueError('--metain need --sg and --ce flags to be defined')
             if args.create is not True and args.isf is None:
                 raise ValueError('--create or --isf flag should be defined') 
             if (args.parallel == False):

@@ -7,22 +7,22 @@ from scipy.optimize import fminbound
 ## Sg is the Genetic covariance matrix with the size of [T x T];
 ## Se is the covariance matrix of error with the size of [T x T];
 
-def LL_fun(x,n,P_sq,w):
-    return(-0.5*(n*np.log(2*np.pi)+sum(np.log(w+x))+sum(P_sq/(w+x))));
+def LL_fun(x,n,sq,w):
+    return(-0.5*(n*np.log(2*np.pi)+sum(np.log(w+x))+sum(sq/(w+x))));
 
-def LLp_fun(x,P_sq,w):
-    return(0.5*(sum(1/(w+x))-sum(P_sq/(w+x)**2)));
+def LLp_fun(x,sq,w):
+    return(0.5*(sum(1/(w+x))-sum(sq/(w+x)**2)));
 
-def LLdp_fun(x,P_sq, w):
-    return(-0.5*(sum(1/(w+x)**2)-2*sum(P_sq/(w+x)**3)));
+def LLdp_fun(x,sq, w):
+    return(-0.5*(sum(1/(w+x)**2)-2*sum(sq/(w+x)**3)));
 
-def NR_root(f, df, x, P_sq, w, i = 0, iter_max = 10000, tol = 2.22044604925e-16**0.5):
+def NR_root(f, df, x, sq, w, i = 0, iter_max = 10000, tol = 2.22044604925e-16**0.5):
     '''
         f: LLp_fun
         df: LLdp_fun
     '''
-    while ( abs(f(x,P_sq,w)) > tol ):
-        x = x - f(x,P_sq,w) / df(x,P_sq,w);
+    while ( abs(f(x,sq,w)) > tol ):
+        x = x - f(x,sq,w) / df(x,sq,w);
         i = i + 1;
         if (i == iter_max): 
             break;
@@ -51,7 +51,7 @@ def vcm_optimization (b, K, tol = 2.22044604925e-16**0.5):
     p = l > tol 
     if(all(p)):
         crossP = np.transpose(c).dot(b);
-        P_sq = crossP**2;
+        sq = crossP**2;
     else:
         cr = np.transpose(c[:,p]).dot(b);
         sq = cr**2;

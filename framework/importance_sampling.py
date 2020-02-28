@@ -54,7 +54,7 @@ def sqrt_ginv(a, rcond=1e-15, hermitian=False):
         res = empty(a.shape[:-2] + (n, m), dtype=a.dtype)
         return wrap(res)
     a = a.conjugate()
-    u, s, vt = svd(a, full_matrices=False, hermitian=hermitian)
+    u, s, vt = svd(a, full_matrices=False, hermitian=True)
     # discard small singular values
     cutoff = rcond[..., newaxis] * amax(s, axis=-1, keepdims=True)
     large = s > cutoff
