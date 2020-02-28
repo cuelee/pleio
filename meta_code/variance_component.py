@@ -28,7 +28,7 @@ def NR_root(f, df, x, P_sq, w, i = 0, iter_max = 10000, tol = 2.22044604925e-16*
             break;
     return(x)
 
-def vcm_optimization (b, K):
+def vcm_optimization (b, K, tol = 2.22044604925e-16**0.5):
     '''
     
     inputs:
@@ -47,20 +47,22 @@ def vcm_optimization (b, K):
     
     '''
     n = len(b);
-    w, v = np.linalg.eigh(K);
-    crossP = np.transpose(v).dot(b);
-    P_sq = crossP**2;
+    l, c = np.linalg.eigh(K);
+    p = l > tol 
+    if(all(p)):
+        crossP = np.transpose(c).dot(b);
+        P_sq = crossP**2;
+    else:
+        cr = np.transpose(c[:,p]).dot(b);
+        sq = cr**2;
+        w = l[p];
     t = [10**(i/4) for i in range(-36,24,1)];
-    init = t[np.argmax([LL_fun(i, n, P_sq, w) for i in t])];
-    mle_tausq = NR_root(LLp_fun, LLdp_fun, init, P_sq, w);
-    
-    if (mle_tausq <0):
-        mle_tausq = 0;
-    null_ll = LL_fun(0, n, P_sq, w);
-    alt_ll = LL_fun(mle_tausq, n, P_sq, w) ;
-    if(alt_ll < null_ll):
-        mle_tausq = 0;
-        alt_ll = null_ll;
+    init = t[np.argmax([LL_fun(i, n, sq, w) for i in t])];
+    tausq = NR_root(LLp_fun, LLdp_fun, init, sq, w);
+    if (tausq <0): tausq = 0;
+    null_ll = LL_fun(0, n, sq, w);
+    alt_ll = LL_fun(tausq, n, sq, w) ;
+    if(alt_ll < null_ll): tausq = 0; alt_ll = null_ll;
     return (- 2 * (null_ll - alt_ll))
 
 def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):

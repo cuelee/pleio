@@ -19,7 +19,7 @@ def sec_to_str(t):
 print('Beginning analysis at {T}'.format(T=time.ctime()));
 start_time = time.time()
 
-n = 5
+n = 7
 rg = np.array([[0.9]*n]*n) 
 for i in range(n):
     rg[i,i] = 1.0 
@@ -32,7 +32,7 @@ sg = np.diag(np.sqrt(h2)).dot(rg).dot(np.diag(np.sqrt(h2)))
 ccov = sg+re
 
 
-run_is(N=10000, gwas_N =np.array(random.sample([1000,1000000,100,100000]*100,n)), U = sg, Ce = re, outf = './isf.isf', mp_cores = 5)
+run_is(N=10000, gwas_N =np.array(random.sample([1000,1000000,100,100000]*100,n)), U = sg, Ce = re, outf = './isf.isf', mp_cores = 1)
 
 #iso=pfun_estim('./isf.isf')
 

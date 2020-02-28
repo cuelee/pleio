@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 '''
-REG: Random Effect General Method
+PLEIO: PLEIOtropy
 Copyright(C) 2018 Cue Hyunkyu Lee 
 
-REG is a command line tool for performing cross-disease meta-analysis
+PLEIO is command line framework to perform cross-disease meta-analyses
 '''
 
 #from framework.meta_analysis import *
 from framework.parse import *
-from framework.importance_sampling import importance_sampling as imsa
+from framework.importance_sampling import importance_sampling
 from framework.significance_estimation import pfun_estim, pvalue_estimation
 from meta_code.variance_component import vcm_optimization
 from meta_code.LS import LS, LS_p 
@@ -18,10 +18,10 @@ import os, sys, traceback, argparse, time
 import multiprocessing as mp
 from itertools import product
 
-codename = 'DELPY'
+codename = 'PLEIO'
 __version__ = 'beta 1.0.0'
 MASTHEAD = "************************************************************\n"
-MASTHEAD += "* DEtect Locus with PleiotropY({c})\n".format(c=codename)
+MASTHEAD += "* PLEIOtropy({c})\n".format(c=codename)
 MASTHEAD += "* Version {V}\n".format(V=__version__)
 MASTHEAD += "* (C)2018 Cue H. Lee\n"
 MASTHEAD += "* Seoul National University\n"
@@ -164,25 +164,40 @@ def generate_mode_class_array_object(ssin, cain, log):
         raise
     return(meta_cain)
 
-def run_vc_optimizer(x, Sg, Rn, n):
-    b= [x[i*2] for i in range(n)];
-    se = [x[i*2+1] for i in range(n)];
-    return(vc_optimization(b, se, Sg, Rn, n))
+def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
+    u,s,vh = np.linalg.svd(X)
+    Positive = s > max(tol * s[0], 0)  
+    if (all(Positive)):
+        res=np.transpose(vh).dot(np.diag(1/s)**0.5).dot(np.transpose(u))
+    elif (not any(Positive)): 
+        res=np.array([0]*np.prod(X.shape)).reshape(X.shape)
+    else:
+        res=vh[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
+    return(res)
+
+def run_vc_optimizer(x, Ut, Ct):
+    b = np.array([x[i*2] for i in range(n)]);
+    se = np.array([x[i*2+1] for i in range(n)]);
+    h = Ut.dot(x)
+    K = np.diag(se).dot(Ct).dot(np.diag(se))
+    return(vcm_optimization(h, K))
 
 def LS_input_parser(x, Rn, n):
     b= [x[i*2] for i in range(n)];
     se = [x[i*2+1] for i in range(n)];
     return(LS(b, se, Rn))
 
-def cv_estimate_statistics(df_data, Sg, Rn, n): 
+def _estimate_statistics(df_data, Sg, Ce):
+    sqrt_Sg_ginv = sqrt_ginv(Sg) 
+    trans_ce = Uinv_sqrt.dot(Ce).dot(Uinv_sqrt)
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['DELPY_stat'] =df_data.apply(lambda x: run_vc_optimizer(x.tolist(), Sg, Rn, n), axis=1)
-    df_out['LS_stat'] =df_data.apply(lambda x: LS_input_parser(x.tolist(), Rn, n), axis=1)
+    df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, trans_ce), axis=1)
+    df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, n), axis=1)
     return(df_out)
 
-def cv_parallelize(meta_cain, func, args): 
+def _parallelize(meta_cain, func, args): 
     data_split = np.array_split(meta_cain.metain, args.ncores)
-    iterable = product(data_split, [meta_cain.Sg.values], [meta_cain.Rn.values], [meta_cain.n])
+    iterable = product(data_split, [meta_cain.Sg.values], [meta_cain.Ce.values])
     pool = mp.Pool(int(args.ncores))
     df_output = pd.concat(pool.starmap(func, iterable))
     pool.close()
@@ -204,47 +219,30 @@ def is_pos_def(x):
     eigs = np.linalg.eigvals(x) 
     return np.all(eigs > 0)
 
-def input_assembler(metainf, sgf, rnf):
+def read_metain(metainf, sgf, rnf):
     class meta_class_array_object_generator(object):
-        def __init__(self, metain_df, sg_df, rn_df, mean_se, tlist):
+        def __init__(self, metain_df, sg_df, ce_df, N_gwas, tlist):
             self.metain = metain_df;
             self.Sg = sg_df;
-            self.Rn = rn_df;
-            self.mean_se = mean_se;
+            self.Ce = ce_df;
+            self.N_gwas = N_gwas;
             self.n = len(tlist);
 
-    def read_mat(fn, LIST):
+    def read_mat(fn, LIST, name):
         df=pd.read_csv(fn,sep='\t'); 
         df.index = df.columns 
         df = df.loc[LIST,LIST]
         if not is_pos_def(df):
-            df = find_closed_PSD(df)
-            df = df + np.diag([1e-6]*df.shape[0])
+            print(name,'is not a positive definite matrix')
         return(df)
-
-    def gen_N(x,n_w):
-        n = [1/(i**2) for i in x]; l=len(n);
-        nom = [n[i]*n_w[i] for i in range(l)]
-        return(sum(nom))
-
-    def get_Nw(sg_df,include):
-        smat = sg_df.to_numpy()
-        dmat = np.diag(1/np.sqrt(np.diag(smat)))
-        cmat=dmat.dot(smat).dot(dmat)
-        c_df = pd.DataFrame(cmat, index = include, columns = include)
-        n_w = abs(c_df).sum(axis=0)**(-1)
-        return(n_w)
 
     metain_df = pd.read_csv(metainf, sep='\t', compression = 'gzip', index_col = ['SNP','A1','A2'], nrows = 100)
     col = metain_df.columns.tolist()
     include = [col[i].split('_beta')[0] for i in range(len(col)) if i % 2 == 0]
-    mean_se = metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]].mean(axis = 0)
-    rn_df=read_mat(rnf,include);
-    sg_df=read_mat(sgf,include);
-    n_w = get_Nw(sg_df,include)
-    metain_df['N'] = metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]].apply(lambda x: gen_N(x.tolist(),n_w), axis = 1)
-    metain_df.set_index('N',append = True, inplace=True)
-    meta_cain = meta_class_array_object_generator(metain_df, sg_df, rn_df, mean_se, include)
+    N_gwas = (metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]]).apply(lambda x: np.mean(1/x**2))
+    error_correlation_df = read_mat(cef,include,'error correlation matrix');
+    genetic_covariance_df = read_mat(sgf,include,'genetic covariance matrix');
+    meta_cain = meta_class_array_object_generator(metain_df, genetic_covariance_df, error_correlation_df, N_gwas, include)
     return(meta_cain)
 
 def delpy(args,log):
@@ -257,24 +255,21 @@ def delpy(args,log):
         #log.log('Read {} Summary statistics'.format(len(cain)));
         meta_cain = generate_mode_class_array_object(ssin, cain, log);
         
-        imsa_Sg = meta_cain.Sg;imsa_Re=meta_cain.Rn;
         del ssin, cain
     
     if args.metain is not None:
-        meta_cain = input_assembler(args.metain, args.sg, args.rn)
-        imsa_Sg = meta_cain.Sg.values;imsa_Re=meta_cain.Rn.values;imsa_se=meta_cain.mean_se;
+        meta_cain = read_metain(args.metain, args.sg, args.ce)
 
     if args.create:
-        imsa_N = args.nis
         importance_sampling_fn = 'isf.txt';
         outdir = args.out; ensure_dir(outdir);
-        imsa_path = os.path.join(outdir,importance_sampling_fn); 
-        imsa(N = imsa_N, Sg = imsa_Sg, Re = imsa_Re, outfn = imsa_path, mp_cores = args.ncores);
+        importance_sampling_f = os.path.join(outdir,importance_sampling_fn); 
+        importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain_Ce, importance_sampling_f, args.ncores);
         iso = pfun_estim(imsa_path);
     else:
         quit('The feature has not been supported yet');
     
-    summary = cv_parallelize(meta_cain, cv_estimate_statistics, args);
+    summary = _parallelize(meta_cain, _estimate_statistics, args);
     summary['DELPY_p'] = summary.apply(lambda x: pvalue_estimation(x['DELPY_stat'], iso), axis=1);
     summary['LS_p'] = summary.apply(lambda x: (x['LS_stat'], ), axis=1);
     
@@ -286,7 +281,7 @@ def delpy(args,log):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--out', default='out',type=str,
-    help='Output file directory name. If --out is not set, REG will use out as the '
+    help='Output file directory name. If --out is not set, PLEIO will use out as the '
     'default output directory.')
 # Besic Random Effect Meta-analysis Flags
 parser.add_argument('--sumstats', default=None, type=str,
