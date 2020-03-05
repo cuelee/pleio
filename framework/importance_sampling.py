@@ -46,7 +46,7 @@ def vcm_optimization_IS (b, n, w, t_v):
         alt_ll = null_ll;
     return (- 2 * (null_ll - alt_ll))
 
-def sqrt_ginv(a, rcond=1e-15, hermitian=False):
+def sqrt_ginv(a, rcond=1e-15):
     a, wrap = _makearray(a)
     rcond = asarray(rcond)
     if _isEmpty2d(a):
@@ -54,7 +54,7 @@ def sqrt_ginv(a, rcond=1e-15, hermitian=False):
         res = empty(a.shape[:-2] + (n, m), dtype=a.dtype)
         return wrap(res)
     a = a.conjugate()
-    u, s, vt = svd(a, full_matrices=False, hermitian=True)
+    u, s, vt = svd(a, full_matrices=False)
     # discard small singular values
     cutoff = rcond[..., newaxis] * amax(s, axis=-1, keepdims=True)
     large = s > cutoff
@@ -163,7 +163,6 @@ def thres_estimate_pvalue(thres, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
     m = [h[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
     cov_tm = estim_cov_tm(d_P, m); 
     cov_t = estim_cov_t(d_P, Palpha);
-    print(cov_t)
     inv_cov_t = svd_inv(cov_t);
     denominator = vector_sum(const_mul(alpha, d_P));
     betas = [inv_cov_t.dot(cov_tm)[0,i] for i in range( nPj )];
@@ -222,8 +221,8 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores):
     d_P = P_density_estimation( P, input_df );
    
     ### It is recommended to get tabulated pdf at 0.1, 0.2, 0.3 ... 1.0, 2.0, 3.0,.... 31.0.  
-    thres_vec = [ float(0.4)] ;
-    #thres_vec = [ float(i*0.1) for i in range(10) ] + [ float(i+1) for i in range(40) ];
+    #thres_vec = [ float(0.4)] ;
+    thres_vec = [ float(i*0.1) for i in range(10) ] + [ float(i+1) for i in range(40) ];
 
     Palpha = vector_sum(const_mul(alpha,d_P));
    
