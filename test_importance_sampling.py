@@ -32,7 +32,7 @@ sg = np.diag(np.sqrt(h2)).dot(rg).dot(np.diag(np.sqrt(h2)))
 ccov = sg+re
 
 
-run_is(N=10000, gwas_N =np.array(random.sample([1000,1000000,100,100000]*100,n)), U = sg, Ce = re, outf = './isf.isf', mp_cores = 1)
+run_is(N=1000, gwas_N =np.array(random.sample([1000,1000000,100,100000]*100,n)), U = sg, Ce = re, outf = './isf.isf', mp_cores = 1)
 
 #iso=pfun_estim('./isf.isf')
 

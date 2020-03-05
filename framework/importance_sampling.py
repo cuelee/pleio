@@ -163,6 +163,7 @@ def thres_estimate_pvalue(thres, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
     m = [h[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
     cov_tm = estim_cov_tm(d_P, m); 
     cov_t = estim_cov_t(d_P, Palpha);
+    print(cov_t)
     inv_cov_t = svd_inv(cov_t);
     denominator = vector_sum(const_mul(alpha, d_P));
     betas = [inv_cov_t.dot(cov_tm)[0,i] for i in range( nPj )];
@@ -221,7 +222,8 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores):
     d_P = P_density_estimation( P, input_df );
    
     ### It is recommended to get tabulated pdf at 0.1, 0.2, 0.3 ... 1.0, 2.0, 3.0,.... 31.0.  
-    thres_vec = [ float(i*0.1) for i in range(10) ] + [ float(i+1) for i in range(40) ];
+    thres_vec = [ float(0.4)] ;
+    #thres_vec = [ float(i*0.1) for i in range(10) ] + [ float(i+1) for i in range(40) ];
 
     Palpha = vector_sum(const_mul(alpha,d_P));
    

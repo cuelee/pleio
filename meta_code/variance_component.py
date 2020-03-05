@@ -52,6 +52,7 @@ def vcm_optimization (b, K, tol = 2.22044604925e-16**0.5):
     if(all(p)):
         crossP = np.transpose(c).dot(b);
         sq = crossP**2;
+        w = l;
     else:
         cr = np.transpose(c[:,p]).dot(b);
         sq = cr**2;
