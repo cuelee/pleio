@@ -175,7 +175,7 @@ def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
         res=vh[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
     return(res)
 
-nef run_vc_optimizer(x, Ut, Ct):
+def run_vc_optimizer(x, Ut, Ct):
     b = np.array([x[i*2] for i in range(n)]);
     se = np.array([x[i*2+1] for i in range(n)]);
     h = Ut.dot(b)
