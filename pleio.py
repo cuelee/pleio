@@ -233,8 +233,6 @@ def read_filetype(filename, magic_dict = { "\x1f\x8b\x08": "gzip", "\x42\x5a\x68
     return None
 
 
-file_type('/Users/cuelee/Dropbox/github/sg.txt.gz')
-
 def read_metain(metainf, sgf, cef):
     class meta_class_array_object_generator(object):
         def __init__(self, metain_df, sg_df, ce_df, N_gwas, tlist):
