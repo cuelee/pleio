@@ -219,6 +219,22 @@ def is_pos_def(x):
     eigs = np.linalg.eigvals(x) 
     return np.all(eigs > 0)
 
+
+def read_filetype(filename, magic_dict = { "\x1f\x8b\x08": "gzip", "\x42\x5a\x68": "bz2", "\x50\x4b\x03\x04": "zip" }):
+
+    max_len = max(len(x) for x in magic_dict)
+
+    with open(filename, encoding="latin-1") as f:
+        file_start = f.read(max_len)
+        print(file_start)
+    for magic, filetype in magic_dict.items():
+        if file_start.startswith(magic):
+            return filetype
+    return None
+
+
+file_type('/Users/cuelee/Dropbox/github/sg.txt.gz')
+
 def read_metain(metainf, sgf, cef):
     class meta_class_array_object_generator(object):
         def __init__(self, metain_df, sg_df, ce_df, N_gwas, tlist):
@@ -229,14 +245,14 @@ def read_metain(metainf, sgf, cef):
             self.n = len(tlist);
 
     def read_mat(fn, LIST, name):
-        df=pd.read_csv(fn,sep='\t'); 
+        df=pd.read_csv(fn,sep='\t', compression = 'infer'); 
         df.index = df.columns 
         df = df.loc[LIST,LIST]
         if not is_pos_def(df):
             print(name,'is not a positive definite matrix')
         return(df)
 
-    metain_df = pd.read_csv(metainf, sep='\t', compression = 'gzip', index_col = ['SNP','A1','A2'], nrows = 100)
+    metain_df = pd.read_csv(metainf, sep='\t', compression = 'infer', index_col = ['SNP','A1','A2'], nrows = 100)
     col = metain_df.columns.tolist()
     include = [col[i].split('_beta')[0] for i in range(len(col)) if i % 2 == 0]
     N_gwas = (metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]]).apply(lambda x: np.mean(1/x**2))
