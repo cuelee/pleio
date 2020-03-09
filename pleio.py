@@ -250,7 +250,7 @@ def read_metain(metainf, sgf, cef):
             print(name,'is not a positive definite matrix')
         return(df)
 
-    metain_df = pd.read_csv(metainf, sep='\t', compression = 'infer', index_col = ['SNP','A1','A2'], nrows = 100)
+    metain_df = pd.read_csv(metainf, sep='\t', compression = 'infer', index_col = ['SNP','A1','A2'])
     col = metain_df.columns.tolist()
     include = [col[i].split('_beta')[0] for i in range(len(col)) if i % 2 == 0]
     N_gwas = (metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]]).apply(lambda x: np.mean(1/x**2))
