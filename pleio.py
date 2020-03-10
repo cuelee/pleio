@@ -188,6 +188,7 @@ def LS_input_parser(x, Ce, n):
     return(LS(b, se, Ce))
 
 def _estimate_statistics(df_data, Sg, Ce):
+    n = np.size(Sg,1)
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
     trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
     df_out = pd.DataFrame(index = df_data.index)

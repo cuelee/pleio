@@ -50,13 +50,6 @@ def estim_stat_extralinear(aval, dtab):
         res = dtab[ivalue];
     return(res);
 
-#def regPestim(cstat, inter_tck, extra_tck, tck_lim):
-#    if (cstat <= tck_lim):
-#        res = Decimal( str( interpolate.splev(cstat, inter_tck, der=0)));
-#    elif(cstat > tck_lim):
-#        res = extrapolate_cue(cstat, extra_tck);
-#    return(res);
-
 def manPestim(cstat, mtck):
     x=mtck[0];y=mtck[1];
     c=float(cstat);
