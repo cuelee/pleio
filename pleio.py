@@ -194,6 +194,8 @@ def _estimate_statistics(df_data, Sg, Ce):
     df_out = pd.DataFrame(index = df_data.index)
     df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, trans_ce, ind), axis=1)
     df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, ind), axis=1)
+    df_out['DELPY_p'] = df_out.loc[:,'DELPY_stat'].apply(lambda x: pvalue_estimation(x, p_functions), axis=1);
+    df_out['LS_p'] = df_out.loc[:,'LS_p'].apply(lambda x: LS_p(x), axis=1);
     return(df_out)
 
 def _parallelize(meta_cain, func, args): 
@@ -285,8 +287,6 @@ def delpy(args,log):
         quit('The feature has not been supported yet');
     
     summary = _parallelize(meta_cain, _estimate_statistics, args);
-    summary['DELPY_p'] = summary.apply(lambda x: pvalue_estimation(x['DELPY_stat'], p_functions), axis=1);
-    summary['LS_p'] = summary.apply(lambda x: LS_p(x['LS_stat']), axis=1);
     
     out_path = os.path.join(outdir+'.delpy.sum.gz');
     summary.to_csv(out_path, index = True, sep='\t', compression='gzip');
