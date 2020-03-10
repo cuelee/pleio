@@ -222,7 +222,7 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores):
    
     ### It is recommended to get tabulated pdf at 0.1, 0.2, 0.3 ... 1.0, 2.0, 3.0,.... 31.0.  
     #thres_vec = [ float(0.4)] ;
-    thres_vec = [ float(i*0.1) for i in range(10) ] + [ float(i+1) for i in range(40) ];
+    thres_vec = [0] + [ float(10**-(7-i)) for i in range(7) ] + [ 0.25,0.5 ]  + [ float(i+1) for i in range(40) ];
 
     Palpha = vector_sum(const_mul(alpha,d_P));
    

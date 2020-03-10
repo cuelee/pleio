@@ -9,7 +9,7 @@ PLEIO is command line framework to perform cross-disease meta-analyses
 #from framework.meta_analysis import *
 from framework.parse import *
 from framework.importance_sampling import importance_sampling
-from framework.significance_estimation import pfun_estim, pvalue_estimation
+from framework.significance_estimation import cof_estimation, pvalue_estimation
 from meta_code.variance_component import vcm_optimization
 from meta_code.LS import LS, LS_p 
 import numpy as np
@@ -280,12 +280,12 @@ def delpy(args,log):
         outdir = args.out; ensure_dir(outdir);
         importance_sampling_f = os.path.join(outdir,importance_sampling_fn); 
         importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, importance_sampling_f, args.ncores);
-        iso = pfun_estim(importance_sampling_f);
+        p_functions = cof_estimation(importance_sampling_f);
     else:
         quit('The feature has not been supported yet');
     
     summary = _parallelize(meta_cain, _estimate_statistics, args);
-    summary['DELPY_p'] = summary.apply(lambda x: pvalue_estimation(x['DELPY_stat'], iso), axis=1);
+    summary['DELPY_p'] = summary.apply(lambda x: pvalue_estimation(x['DELPY_stat'], p_functions), axis=1);
     summary['LS_p'] = summary.apply(lambda x: LS_p(x['LS_stat']), axis=1);
     
     out_path = os.path.join(outdir+'.delpy.sum.gz');
