@@ -175,25 +175,25 @@ def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
         res=vh[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
     return(res)
 
-def run_vc_optimizer(x, Ut, Ct):
-    b = np.array([x[i*2] for i in range(n)]);
-    se = np.array([x[i*2+1] for i in range(n)]);
-    h = Ut.dot(b)
+def run_vc_optimizer(x, Ut, Ct, ind):
+    b = Ut.dot(np.array([x[i] for i in ind]));
+    se = np.array([x[i+1] for i in ind]);
     K = np.diag(se).dot(Ct).dot(np.diag(se))
-    return(vcm_optimization(h, K))
+    return(vcm_optimization(b, K))
 
-def LS_input_parser(x, Ce, n):
-    b= [x[i*2] for i in range(n)];
-    se = [x[i*2+1] for i in range(n)];
+def LS_input_parser(x, Ce, ind):
+    b = [x[i] for i in ind];
+    se = [x[i+1] for i in ind];
     return(LS(b, se, Ce))
 
 def _estimate_statistics(df_data, Sg, Ce):
     n = np.size(Sg,1)
+    ind = [[i*2] for i in range(n)]
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
     trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, trans_ce), axis=1)
-    df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, n), axis=1)
+    df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, trans_ce, ind), axis=1)
+    df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, ind), axis=1)
     return(df_out)
 
 def _parallelize(meta_cain, func, args): 
