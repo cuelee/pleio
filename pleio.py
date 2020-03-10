@@ -188,7 +188,7 @@ def LS_input_parser(x, Ce, ind):
 
 def _estimate_statistics(df_data, Sg, Ce):
     n = np.size(Sg,1)
-    ind = [[i*2] for i in range(n)]
+    ind = [i*2 for i in range(n)]
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
     trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
     df_out = pd.DataFrame(index = df_data.index)
@@ -286,7 +286,7 @@ def delpy(args,log):
     
     summary = _parallelize(meta_cain, _estimate_statistics, args);
     summary['DELPY_p'] = summary.apply(lambda x: pvalue_estimation(x['DELPY_stat'], iso), axis=1);
-    summary['LS_p'] = summary.apply(lambda x: (x['LS_stat'], ), axis=1);
+    summary['LS_p'] = summary.apply(lambda x: LS_p(x['LS_stat']), axis=1);
     
     out_path = os.path.join(outdir+'.delpy.sum.gz');
     summary.to_csv(out_path, index = True, sep='\t', compression='gzip');

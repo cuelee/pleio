@@ -64,7 +64,7 @@ def vcm_optimization (b, K, tol = 2.22044604925e-16**0.5):
     null_ll = LL_fun(0, n, sq, w);
     alt_ll = LL_fun(tausq, n, sq, w) ;
     if(alt_ll < null_ll): tausq = 0; alt_ll = null_ll;
-    return (- 2 * (null_ll - alt_ll))
+    return (float(- 2 * (null_ll - alt_ll)))
 
 def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
     u,s,vh = np.linalg.svd(X)

@@ -30,7 +30,7 @@ def LS(betas, stders, cor):
     newstd = np.sqrt(newv)
     z = newx/newstd
 
-    return(z) 
+    return(float(z)) 
 
 def LS_p(z):
     return(chi2.sf(z**2, df = 1, loc = 0, scale = 1))
