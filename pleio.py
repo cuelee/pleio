@@ -186,7 +186,7 @@ def LS_input_parser(x, Ce, ind):
     se = [x[i+1] for i in ind];
     return(LS(b, se, Ce))
 
-def _estimate_statistics(df_data, Sg, Ce):
+def _estimate_statistics(df_data, Sg, Ce, isf):
     n = np.size(Sg,1)
     ind = [i*2 for i in range(n)]
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
@@ -194,13 +194,14 @@ def _estimate_statistics(df_data, Sg, Ce):
     df_out = pd.DataFrame(index = df_data.index)
     df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, trans_ce, ind), axis=1)
     df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, ind), axis=1)
+    p_functions = cof_estimation(isf);
     df_out['DELPY_p'] = df_out.loc[:,'DELPY_stat'].apply(lambda x: pvalue_estimation(x, p_functions), axis=1);
     df_out['LS_p'] = df_out.loc[:,'LS_p'].apply(lambda x: LS_p(x), axis=1);
     return(df_out)
 
-def _parallelize(meta_cain, func, args): 
+def _parallelize(meta_cain, func, args, isf): 
     data_split = np.array_split(meta_cain.metain, args.ncores)
-    iterable = product(data_split, [meta_cain.Sg.values], [meta_cain.Ce.values])
+    iterable = product(data_split, [meta_cain.Sg.values], [meta_cain.Ce.values], [isf])
     pool = mp.Pool(int(args.ncores))
     df_output = pd.concat(pool.starmap(func, iterable))
     pool.close()
@@ -282,11 +283,10 @@ def delpy(args,log):
         outdir = args.out; ensure_dir(outdir);
         importance_sampling_f = os.path.join(outdir,importance_sampling_fn); 
         importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, importance_sampling_f, args.ncores);
-        p_functions = cof_estimation(importance_sampling_f);
     else:
         quit('The feature has not been supported yet');
     
-    summary = _parallelize(meta_cain, _estimate_statistics, args);
+    summary = _parallelize(meta_cain, _estimate_statistics, args, importance_sampling_f);
     
     out_path = os.path.join(outdir+'.delpy.sum.gz');
     summary.to_csv(out_path, index = True, sep='\t', compression='gzip');
