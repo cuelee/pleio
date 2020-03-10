@@ -196,7 +196,7 @@ def _estimate_statistics(df_data, Sg, Ce, isf):
     df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, ind), axis=1)
     p_functions = cof_estimation(isf);
     df_out['DELPY_p'] = df_out.loc[:,'DELPY_stat'].apply(lambda x: pvalue_estimation(x, p_functions));
-    df_out['LS_p'] = df_out.loc[:,'LS_p'].apply(lambda x: LS_p(x));
+    df_out['LS_p'] = df_out.loc[:,'LS_stat'].apply(lambda x: LS_p(x));
     return(df_out)
 
 def _parallelize(meta_cain, func, args, isf): 
