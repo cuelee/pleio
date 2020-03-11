@@ -179,7 +179,7 @@ def run_vc_optimizer(x, Ut, Ce, ind):
     b = Ut.dot(np.array([x[i] for i in ind]));
     se = np.array([x[i+1] for i in ind]);
     trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
-    K = sqrt_Sg_ginv.dot(np.diag(se)).dot(Ce).dot(np.diag(se)).dot(sqrt_Sg_ginv.dot))
+    K = sqrt_Sg_ginv.dot(np.diag(se)).dot(Ce).dot(np.diag(se)).dot(sqrt_Sg_ginv)
     return(vcm_optimization(b, K))
 
 def LS_input_parser(x, Ce, ind):
