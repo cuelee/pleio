@@ -175,10 +175,11 @@ def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
         res=vh[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
     return(res)
 
-def run_vc_optimizer(x, Ut, Ct, ind):
+def run_vc_optimizer(x, Ut, Ce, ind):
     b = Ut.dot(np.array([x[i] for i in ind]));
     se = np.array([x[i+1] for i in ind]);
-    K = np.diag(se).dot(Ct).dot(np.diag(se))
+    trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
+    K = sqrt_Sg_ginv.dot(np.diag(se)).dot(Ce).dot(np.diag(se)).dot(sqrt_Sg_ginv.dot))
     return(vcm_optimization(b, K))
 
 def LS_input_parser(x, Ce, ind):
@@ -190,9 +191,8 @@ def _estimate_statistics(df_data, Sg, Ce, isf):
     n = np.size(Sg,1)
     ind = [i*2 for i in range(n)]
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
-    trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, trans_ce, ind), axis=1)
+    df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, Ce, ind), axis=1)
     df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, ind), axis=1)
     p_functions = cof_estimation(isf);
     df_out['DELPY_p'] = df_out.loc[:,'DELPY_stat'].apply(lambda x: pvalue_estimation(x, p_functions));
