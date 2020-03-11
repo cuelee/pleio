@@ -175,11 +175,10 @@ def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
         res=vh[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
     return(res)
 
-def run_vc_optimizer(x, Ut, Ce, ind):
-    b = Ut.dot(np.array([x[i] for i in ind]));
+def run_vc_optimizer(x, sUt, Ce, ind):
+    b = sUt.dot(np.array([x[i] for i in ind]));
     se = np.array([x[i+1] for i in ind]);
-    trans_ce = sqrt_Sg_ginv.dot(Ce).dot(sqrt_Sg_ginv)
-    K = sqrt_Sg_ginv.dot(np.diag(se)).dot(Ce).dot(np.diag(se)).dot(sqrt_Sg_ginv)
+    K = sUt.dot(np.diag(se)).dot(Ce).dot(np.diag(se)).dot(sUt)
     return(vcm_optimization(b, K))
 
 def LS_input_parser(x, Ce, ind):
