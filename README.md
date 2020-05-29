@@ -26,7 +26,7 @@ Once the above has completed, you can run the following command:
 
 ## Citation
 
-If you use the software, please cite
+If you use the software, please cite\n
 [Cue Hyunkyu Lee. et al. A unified method for mapping and interpreting pleiotropic loci in cross-trait joint analysis of complex traits.]
 
 ## License 
