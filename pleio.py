@@ -19,9 +19,9 @@ import multiprocessing as mp
 from itertools import product
 
 codename = 'PLEIO'
-__version__ = 'beta 1.0.0'
+__version__ = '1.0'
 MASTHEAD = "************************************************************\n"
-MASTHEAD += "* PLEIOtropy({c})\n".format(c=codename)
+MASTHEAD += "* PLEIO({c})\n".format(c=codename)
 MASTHEAD += "* Version {V}\n".format(V=__version__)
 MASTHEAD += "* (C)2018 Cue H. Lee\n"
 MASTHEAD += "* Seoul National University\n"
