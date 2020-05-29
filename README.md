@@ -1,4 +1,5 @@
-# Pleiotropic Locus Exploration and Interpretation using Optimal test(pleio) `v1.0.0`
+# PLEIO 
+Pleiotropic Locus Exploration and Interpretation using Optimal test(pleio)
 
 `pleio` is a command line tool for performinig meta-analysis of multiple GWAS summary statistics. 
 
