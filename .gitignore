@@ -39,4 +39,5 @@ Thumbs.db
 
 # PLEIO isf 
 ####################
-.isf
+*.isf
+test_*
