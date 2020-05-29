@@ -120,20 +120,26 @@ def vector_sum(alist):
         sumvec = [sumvec[j] + alist[i][j] for j in range(len(alist[i]))];
     return(sumvec);
 
-def estim_cov_tm(pdf_Pj, m):
-    l = len(pdf_Pj);
+def estim_t(pdf_Pj, Palpha):
+    t = []
+    for i in range(len(pdf_Pj)):
+        array = np.array([ pdf_Pj[i][j] / Palpha[j] for j in range(len(pdf_Pj[i]))])
+        t.append( array )
+    return(t)
+
+def estim_cov_tm(t, m):
+    l = len(t);
     tm_vec = [0]*l;
     for i in range(l):
-        tm_vec[i] = np.cov(m, pdf_Pj[i])[0][1];
+        tm_vec[i] = np.cov(m, t[i])[0][1];
     return(np.array(tm_vec));
 
-def estim_cov_t(pdf_Pj, Palpha):
-    l = len(pdf_Pj);
-    t_mat = [];
-    for i in range(l):
-        array = np.array([pdf_Pj[i][j]/Palpha[j] for j in range(len(pdf_Pj[i]))])
-        t_mat.append(array)
-    return(np.cov(np.array(t_mat)));
+def estim_cov_t(t):
+    #t_mat = [];
+    #for i in range(l):
+    #    array = np.array([pdf_Pj[i][j]/Palpha[j] for j in range(len(pdf_Pj[i]))])
+    #    t_mat.append(array)
+    return(np.cov(np.array(t)));
 
 def svd_inv(cov_t):
     u,s,v = np.linalg.svd(cov_t);
@@ -161,8 +167,9 @@ def ims_parallelize(df_input, func, cores, partitions, n, w, t_v):
 def thres_estimate_pvalue(thres, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
     h = h_t(ts = Sdelpy, thres = thres);
     m = [h[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
-    cov_tm = estim_cov_tm(d_P, m); 
-    cov_t = estim_cov_t(d_P, Palpha);
+    t = estim_t(d_P, Palpha)
+    cov_tm = estim_cov_tm(t, m); 
+    cov_t = estim_cov_t(t);
     inv_cov_t = svd_inv(cov_t);
     denominator = vector_sum(const_mul(alpha, d_P));
     betas = [inv_cov_t.dot(cov_tm)[0,i] for i in range( nPj )];
