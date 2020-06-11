@@ -13,9 +13,10 @@ cd pleio
 
 In order to run `pleio.py` you will need the following python dependencies:
 ```
-Python v.3.6.5 <
-numpy v.1.15.2 <
-scipy v.1.1.0 <
+python >= v.3.6.5 <
+pandas >= 0.25.3 
+numpy >= v.1.15.2 <
+scipy >= v.1.1.0 <
 ```
 
 Once the above has completed, you can run the following command:
