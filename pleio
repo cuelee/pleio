@@ -98,10 +98,10 @@ def _estimate_statistics(df_data, Sg, Ce, isf):
     ind = [i*2 for i in range(n)]
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['DELPY_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, Ce, ind), axis=1)
+    df_out['pleio_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, Ce, ind), axis=1)
     df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, ind), axis=1)
     p_functions = cof_estimation(isf);
-    df_out['DELPY_p'] = df_out.loc[:,'DELPY_stat'].apply(lambda x: pvalue_estimation(x, p_functions));
+    df_out['pleio_p'] = df_out.loc[:,'pleio_stat'].apply(lambda x: pvalue_estimation(x, p_functions));
     df_out['LS_p'] = df_out.loc[:,'LS_stat'].apply(lambda x: LS_p(x));
     return(df_out)
 
@@ -175,13 +175,13 @@ parser.add_argument('--ce', default=None, type=str,
 parser.add_argument('--isf', default=None, type=str,
     help='Filename Prefix for Estimated null-distribution cumulative densities. ')
 parser.add_argument('--create', default = False, action='store_true',
-    help='If this flag is set, DELPY will run importance sampling and create new isf. ')
+    help='If this flag is set, PLEIO will run importance sampling and create new isf. ')
 parser.add_argument('--nis', default = int(100000), type = int,
     help='Number of samples for importance sampling. ')
 parser.add_argument('--parallel', default = False, action='store_true',
-    help='If this flag is set, DELPY will run parallel computing ')
+    help='If this flag is set, PLEIO will run parallel computing ')
 parser.add_argument('--ncores', default = mp.cpu_count() - 2, type = int, 
-    help='Number of cpu cores for parallel computing. DELPY uses max(CPUs) as default.')
+    help='Number of cpu cores for parallel computing. PLEIO uses max(CPUs) as default.')
 ### To understand input file format
 parser.add_argument('--snp', default='SNP', type=str,
     help='Name of SNP column (if not a name that ldsc understands). NB: case insensitive.')
