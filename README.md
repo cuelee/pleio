@@ -11,13 +11,12 @@ git clone git://github.com/hanlab-SNU/pleio/pleio.git
 cd pleio
 ```
 
-In order to run `pleio.py` you will need the following python dependencies:
-```
-python >= v.3.6.5 <
-pandas >= 0.25.3 
-numpy >= v.1.15.2 <
-scipy >= v.1.1.0 <
-```
+In order to run `pleio`, the following python dependencies must be installed in your system.
+
+- python >= 3.7.4
+- pandas >= 1.0.4
+- numpy >= v.1.18.1
+- scipy >= v.1.4.1
 
 Once the above has completed, you can run the following command:
 
