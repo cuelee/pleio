@@ -49,7 +49,7 @@ def vcm_optimization_IS (b, n, w, t_v):
 def sqrt_ginv(a, rcond=1e-15):
     a, wrap = _makearray(a)
     rcond = asarray(rcond)
-    if _isEmpty2d(a):
+    if _is_empty_2d(a):
         m, n = a.shape[-2:]
         res = empty(a.shape[:-2] + (n, m), dtype=a.dtype)
         return wrap(res)
