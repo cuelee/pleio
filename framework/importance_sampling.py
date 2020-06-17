@@ -10,7 +10,7 @@ import multiprocessing as mp
 from itertools import product
 from decimal import *
 from scipy.stats import multivariate_normal as MVN
-from numpy.linalg.linalg import _makearray, asarray, _isEmpty2d, empty, svd, divide, matmul, newaxis, amax, transpose, multiply
+from numpy.linalg.linalg import _makearray, asarray, _is_empty_2d, empty, svd, divide, matmul, newaxis, amax, transpose, multiply
 
 ### vcm_optimization for IS 
 def LL_fun(x,n,P_sq,w):
