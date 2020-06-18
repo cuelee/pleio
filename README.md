@@ -23,11 +23,13 @@ Once the above has completed, you can run the following command:
 ```
 ./pleio.py -h
 ```
+## Tutorial 
+If you want to try a joint analysis of 18 characteristics of cardiovascular diseases using the PLEIO framework, please use the following [link](https://github.com/hanlab-SNU/pleio/wiki/Identification-of-pleiotropic-loci-with-PLEIO)
 
 ## Citation
 
 If you use the software, please cite  
-`Cue Hyunkyu Lee. et al. A unified method for mapping and interpreting pleiotropic loci in cross-trait joint analysis of complex traits.`
+Cue Hyunkyu Lee., Huwenbo Shi., Bogdan Pasaniuc., Eleazar Eskin., Buhm Han. A method to map and interpret pleiotropic loci using summary statistics of multiple traits. bioRxiv 2020.06.16.155879; doi: https://doi.org/10.1101/2020.06.16.155879
 
 ## License 
 
