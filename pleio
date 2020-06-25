@@ -74,7 +74,7 @@ def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
     elif (not any(Positive)): 
         res=np.array([0]*np.prod(X.shape)).reshape(X.shape)
     else:
-        res=vh[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
+        res=np.transpose(vh[:, Positive]).dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
     return(res)
 
 def is_pos_def(x):
@@ -83,9 +83,9 @@ def is_pos_def(x):
 
 
 def run_vc_optimizer(x, sUt, Ce, ind):
-    b = sUt.dot(np.array([x[i] for i in ind]));
+    b = np.transpose(sUt).dot(np.array([x[i] for i in ind]));
     se = np.array([x[i+1] for i in ind]);
-    K = sUt.dot(np.diag(se)).dot(Ce).dot(np.diag(se)).dot(sUt)
+    K = np.transpose(sUt).dot(np.diag(se)).dot(Ce).dot(np.diag(se)).dot(sUt)
     return(vcm_optimization(b, K))
 
 def LS_input_parser(x, Ce, ind):

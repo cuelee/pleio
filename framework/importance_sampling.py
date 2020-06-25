@@ -215,7 +215,7 @@ def thres_parallelize(thres_vec, func, cores, Sdelpy, Palpha, alpha, d_Q, d_P, n
     return(res_list)
 
 ## GenCor and RECor: np.matrix, N: int, outfn: str
-def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores):
+def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-16**0.5):
     se = 1/(np.array(gwas_N)**0.5)
 
     ### we set random seed 
@@ -233,6 +233,9 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores):
     Uinv_sqrt = sqrt_ginv(U);
     K = Uinv_sqrt.dot(D).dot(Uinv_sqrt)
     w, v = np.linalg.eigh(K); t_v = np.transpose(v)
+    pos = w > max(tol * w[0], 0)
+    w_pos = w[pos]
+    t_v_pos = t_v[pos]
 
     ## PLEIO's importance sampling method reqiores probability densities to generate samples. They have means of [0] * n and the covariance matrix of c_Pj * Ce
     c_Pj = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
@@ -248,7 +251,7 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores):
     
     
     #data = ims_parallelize( input_df, ims_estimate_statistics, cores, partitions, n, w, t_v )
-    data = ims_parallelize( transformed_df, ims_estimate_statistics, cores, partitions, n, w, t_v )
+    data = ims_parallelize( transformed_df, ims_estimate_statistics, cores, partitions, n, w_pos, t_v_pos )
     Sdelpy = data['LL_RTS'].tolist()
 
     d_Q = MVN.pdf( input_df, [0] * n, Ce );
