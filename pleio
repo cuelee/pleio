@@ -10,7 +10,7 @@ PLEIO is command line framework to perform cross-disease meta-analyses
 #from framework.meta_analysis import *
 from framework.parse import *
 from framework.importance_sampling import importance_sampling
-from framework.significance_estimation import cof_estimation, pvalue_estimation
+from framework.significance_estimation import cof_estimation, pvalue_estimation, pval_flattening 
 from meta_code.variance_component import vcm_optimization
 from meta_code.LS import LS, LS_p 
 import numpy as np
@@ -122,6 +122,7 @@ def read_input(infile, sgf, cef):
             self.Ce = ce_df;
             self.N_gwas = N_gwas;
             self.n = len(tlist);
+            self.zero_prob = float(0.195);
 
     def read_mat(fn, LIST, name):
         df = pd.read_csv(fn,sep='\t', compression = 'infer'); 
@@ -149,11 +150,16 @@ def pleio(args,log):
     if args.create:
         outdir = args.out;
         importance_sampling_f = os.path.join(outdir + '.isf'); 
-        importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, importance_sampling_f, args.ncores);
+        meta_cain.zero_prob = importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, importance_sampling_f, args.ncores);
     else:
         quit('The feature has not been supported yet');
     
+        
     summary = _parallelize(meta_cain, _estimate_statistics, args, importance_sampling_f);
+
+    if args.pvalue_flattening:
+        summary = pval_flattening(summary, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, args.ncores ,importance_sampling_f )
+        #pval_flattening(summary, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, args.ncores ,importance_sampling_f )
     
     out_path = os.path.join(outdir+'.txt.gz');
     summary.to_csv(out_path, index = True, sep='\t', compression='gzip');
@@ -178,6 +184,8 @@ parser.add_argument('--create', default = False, action='store_true',
     help='If this flag is set, PLEIO will run importance sampling and create new isf. ')
 parser.add_argument('--nis', default = int(100000), type = int,
     help='Number of samples for importance sampling. ')
+parser.add_argument('--pvalue_flattening', default = False, action= 'store_true',
+    help='Flattening p-value distribution. This is necessary if you want to check lambda GC')
 parser.add_argument('--parallel', default = False, action='store_true',
     help='If this flag is set, PLEIO will run parallel computing ')
 parser.add_argument('--ncores', default = mp.cpu_count() - 2, type = int, 
