@@ -74,7 +74,7 @@ def sqrt_ginv (X, tol = 2.22044604925e-16**0.5):
     elif (not any(Positive)): 
         res=np.array([0]*np.prod(X.shape)).reshape(X.shape)
     else:
-        res=np.transpose(vh[:, Positive]).dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
+        res=np.transpose(vh)[:, Positive].dot(np.diag(1/s[Positive])**0.5).dot(np.transpose(u[:, Positive]))
     return(res)
 
 def is_pos_def(x):
@@ -153,7 +153,6 @@ def pleio(args,log):
         meta_cain.zero_prob = importance_sampling(args.nis, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, importance_sampling_f, args.ncores);
     else:
         quit('The feature has not been supported yet');
-    
         
     summary = _parallelize(meta_cain, _estimate_statistics, args, importance_sampling_f);
 
