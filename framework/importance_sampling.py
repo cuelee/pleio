@@ -10,35 +10,7 @@ import multiprocessing as mp
 from itertools import product
 from decimal import *
 from scipy.stats import multivariate_normal as MVN
-from numpy.linalg.linalg import svd
-from numpy.core import empty, asarray, newaxis, amax, swapaxes, divide, matmul, multiply
-from framework.significance_estimation import cof_estimation, pvalue_estimation, pval_flattening
-
-def _is_empty_2d(arr):
-    # check size first for efficiency
-    return arr.size == 0 and product(arr.shape[-2:]) == 0
-
-def _makearray(a):
-    new = asarray(a)
-    wrap = getattr(a, "__array_prepare__", new.__array_wrap__)
-    return new, wrap
-
-def transpose(a):
-    """
-    Transpose each matrix in a stack of matrices.
-    
-    Unlike np.transpose, this only swaps the last two axes, rather than all of
-    them
-    
-    Parameters
-    ----------
-    a : (...,M,N) array_like
-    
-    Returns
-    -------
-    aT : (...,N,M) ndarray
-    """
-    return swapaxes(a, -1, -2)
+from numpy.linalg.linalg import _makearray, asarray, _isEmpty2d, empty, svd, divide, matmul, newaxis, amax, transpose, multiply
 
 ### vcm_optimization for IS 
 def LL_fun(x,n,P_sq,w):
@@ -58,13 +30,12 @@ def NR_root(f, df, x, P_sq, w, i = 0, iter_max = 10000, tol = 2.22044604925e-16*
             break;
     return(x)
 
-def vcm_optimization_IS (b, n, w, t_v):
+def vcm_optimization_IS (b, n, w, t_v , tol = 2.22044604925e-16**0.5):
     t = [10**(i/4) for i in range(-36,24,1)];
     crossP = t_v.dot(b);
     P_sq = crossP**2;
     init = t[np.argmax([LL_fun(i, n, P_sq, w) for i in t])];
     mle_tausq = NR_root(LLp_fun, LLdp_fun, init, P_sq, w);
-
     if (mle_tausq <0):
         mle_tausq = 0;
     null_ll = LL_fun(0, n, P_sq, w);
@@ -77,7 +48,7 @@ def vcm_optimization_IS (b, n, w, t_v):
 def sqrt_ginv(a, rcond=1e-15):
     a, wrap = _makearray(a)
     rcond = asarray(rcond)
-    if _is_empty_2d(a):
+    if _isEmpty2d(a):
         m, n = a.shape[-2:]
         res = empty(a.shape[:-2] + (n, m), dtype=a.dtype)
         return wrap(res)
@@ -148,26 +119,20 @@ def vector_sum(alist):
         sumvec = [sumvec[j] + alist[i][j] for j in range(len(alist[i]))];
     return(sumvec);
 
-def estim_t(pdf_Pj, Palpha):
-    t = []
-    for i in range(len(pdf_Pj)):
-        array = np.array([ pdf_Pj[i][j] / Palpha[j] for j in range(len(pdf_Pj[i]))])
-        t.append( array )
-    return(t)
-
-def estim_cov_tm(t, m):
-    l = len(t);
+def estim_cov_tm(pdf_Pj, m):
+    l = len(pdf_Pj);
     tm_vec = [0]*l;
     for i in range(l):
-        tm_vec[i] = np.cov(m, t[i])[0][1];
+        tm_vec[i] = np.cov(m, pdf_Pj[i])[0][1];
     return(np.array(tm_vec));
 
-def estim_cov_t(t):
-    #t_mat = [];
-    #for i in range(l):
-    #    array = np.array([pdf_Pj[i][j]/Palpha[j] for j in range(len(pdf_Pj[i]))])
-    #    t_mat.append(array)
-    return(np.cov(np.array(t)));
+def estim_cov_t(pdf_Pj, Palpha):
+    l = len(pdf_Pj);
+    t_mat = [];
+    for i in range(l):
+        array = np.array([pdf_Pj[i][j]/Palpha[j] for j in range(len(pdf_Pj[i]))])
+        t_mat.append(array)
+    return(np.cov(np.array(t_mat)));
 
 def svd_inv(cov_t):
     u,s,v = np.linalg.svd(cov_t);
@@ -192,12 +157,11 @@ def ims_parallelize(df_input, func, cores, partitions, n, w, t_v):
     pool.join()
     return(df_output)
 
-def thres_estimate_pvalue(thres, LRT_stats, Palpha, alpha, d_Q, d_P, nPj, N):
-    h = h_t(ts = LRT_stats, thres = thres);
+def thres_estimate_pvalue(thres, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
+    h = h_t(ts = Sdelpy, thres = thres);
     m = [h[i] * d_Q[i] / Palpha[i] for i in range(len(d_Q))];
-    t = estim_t(d_P, Palpha)
-    cov_tm = estim_cov_tm(t, m); 
-    cov_t = estim_cov_t(t);
+    cov_tm = estim_cov_tm(d_P, m); 
+    cov_t = estim_cov_t(d_P, Palpha);
     inv_cov_t = svd_inv(cov_t);
     denominator = vector_sum(const_mul(alpha, d_P));
     betas = [inv_cov_t.dot(cov_tm)[0,i] for i in range( nPj )];
@@ -207,8 +171,8 @@ def thres_estimate_pvalue(thres, LRT_stats, Palpha, alpha, d_Q, d_P, nPj, N):
     return(pd.DataFrame([IS_estim], columns = ['pvalue'], index = [thres]))
 
 
-def thres_parallelize(thres_vec, func, cores, LRT_stats, Palpha, alpha, d_Q, d_P, nPj, N):
-    iterable = product(thres_vec, [LRT_stats], [Palpha], [alpha], [d_Q], [d_P], [nPj], [N])
+def thres_parallelize(thres_vec, func, cores, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
+    iterable = product(thres_vec, [Sdelpy], [Palpha], [alpha], [d_Q], [d_P], [nPj], [N])
     pool = mp.Pool(int(cores))
     res_list = pd.concat(pool.starmap(func, iterable))
     pool.close()
@@ -232,14 +196,15 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-1
     output_filename = outf; nstudy = len(se); n = nstudy; D = np.diag(se).dot(Ce).dot(np.diag(se));
     null_D = np.diag([1]*n).dot(Ce).dot(np.diag([1]*n))
     Uinv_sqrt = sqrt_ginv(U);
-    K = Uinv_sqrt.dot(D).dot(Uinv_sqrt)
+    K = np.transpose(Uinv_sqrt).dot(D).dot(Uinv_sqrt)
+    print(K)
     w, v = np.linalg.eigh(K); t_v = np.transpose(v)
-    pos = w > max(tol * w[0], 0)
-    w_pos = w[pos]
-    t_v_pos = t_v[pos]
-
-    ## PLEIO's importance sampling method needs probability densities. Each of these has a mean of [0] * n and the covariance matrix of c_Pj * Ce
-    c_Pj = [1,1.05,1.1,1.2,1.4,1.7,2,2.5,3,4,5];
+    print(w,v)
+    pos = w > tol
+    w_pos = w[pos]; t_v_pos = t_v[pos]
+	
+    ## PLEIO's importance sampling method reqiores probability densities to generate samples. They have means of [0] * n and the covariance matrix of c_Pj * Ce
+    c_Pj = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
 
     nPj = len(c_Pj); mean_P = [0] * nPj; alpha = [1 / nPj] * nPj;   
     P = generate_P(0, c_Pj, null_D, n)
@@ -253,23 +218,21 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-1
     
     #data = ims_parallelize( input_df, ims_estimate_statistics, cores, partitions, n, w, t_v )
     data = ims_parallelize( transformed_df, ims_estimate_statistics, cores, partitions, n, w_pos, t_v_pos )
-    Spleio = data['LL_RTS'].tolist()
+    Sdelpy = data['LL_RTS'].tolist()
 
     d_Q = MVN.pdf( input_df, [0] * n, Ce );
     d_P = P_density_estimation( P, input_df );
    
     ### It is recommended to get tabulated pdf at 0.1, 0.2, 0.3 ... 1.0, 2.0, 3.0,.... 31.0.  
     #thres_vec = [ float(0.4)] ;
-    thres_vec = [0] + np.logspace(-7, 1, num = 20, base = 10).tolist()  + [ float(i+11) for i in range(30) ];
+    thres_vec = [ float(i*0.1) for i in range(10) ] + [ float(i+1) for i in range(40) ];
 
     Palpha = vector_sum(const_mul(alpha,d_P));
    
-    pvalue_df = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, Spleio, Palpha, alpha, d_Q, d_P, nPj, N)
+    pvalue_df = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N)
     print('Completed estimating the inverse CDFs at different threshold values for PLEIO\'s variance component model.'); 
     
     sorted_pvalue = pvalue_df.sort_index()
     print(sorted_pvalue)
     sorted_pvalue.to_csv(output_filename, header = False, index = True, sep = " ")
     print('Wrote tabulated inverse cdf');
-    
-
