@@ -228,7 +228,7 @@ if __name__ == '__main__':
 
         else:
             print ('Error: no analysis selected.')
-            print ('Use delpy.py -h for details.')
+            print ('Use pleio -h for details.')
 
     except Exception:
         log.mlog(traceback.format_exc());

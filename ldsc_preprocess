@@ -1,0 +1,374 @@
+#!/usr/bin/env python3
+
+'''
+PLEIO: PLEIOtropy
+Copyright(C) 2018 Cue Hyunkyu Lee 
+
+PLEIO is command line framework to perform cross-disease meta-analyses
+'''
+
+from __future__ import division
+import numpy as np
+import pandas as pd
+import os, sys, traceback, argparse, time
+import multiprocessing as mp
+ldsc_dir = os.path.dirname(os.path.abspath(__file__))+'/ldsc'
+if os.path.isdir(ldsc_dir):
+    open(ldsc_dir+'/__init__.py', 'a').close()
+else: raise(ValueError('directory name {} cannot be found in directory {}. Install ldsc in the same directory as the \'preprocess.py\''.format('ldsc', os.path.dirname(os.path.abspath(__file__)))))
+
+import ldsc.ldscore.ldscore as ld
+import ldsc.ldscore.parse as ps
+import ldsc.ldscore.sumstats as sumstats
+import ldsc.ldscore.regressions as reg
+from itertools import product
+
+codename = 'PLEIO_preprocess'
+__version__ = '1.0'
+MASTHEAD = "************************************************************\n"
+MASTHEAD += "* PLEIO({c})\n".format(c=codename)
+MASTHEAD += "* Version {V}\n".format(V=__version__)
+MASTHEAD += "* (C)2018 Cue H. Lee\n"
+MASTHEAD += "* Seoul National University\n"
+MASTHEAD += "* Unlicensed software\n"
+MASTHEAD += "************************************************************\n"
+
+def sec_to_str(t):
+    '''Convert seconds to days:hours:minutes:seconds'''
+    [d, h, m, s, n] = reduce(lambda ll, b : divmod(ll[0], b) + ll[1:], [(t, 1), 60, 60, 24])
+    f = ''
+    if d > 0:
+        f += '{D}d:'.format(D=d)
+    if h > 0:
+        f += '{H}h:'.format(H=h)
+    if m > 0:
+        f += '{M}m:'.format(M=m)
+
+    f += '{S}s'.format(S=s)
+    return f
+
+def _remove_dtype(x):
+    '''Removes dtype: float64 and dtype: int64 from pandas printouts'''
+    x = str(x)
+    x = x.replace('\ndtype: int64', '')
+    x = x.replace('\ndtype: float64', '')
+    return x
+
+
+class Logger(object):
+    '''
+    Lightweight logging.
+    TODO: replace with logging module
+
+    '''
+    def __init__(self, fh):
+        self.log_fh = open(fh, 'wb')
+
+    def log(self, msg):
+        '''
+        Print to log file and stdout with a single command.
+
+        '''
+        print >>self.log_fh, msg
+        print msg
+
+def create_folder(p):
+    try:
+        os.mkdir(p)
+    except OSError:
+        print ("Creation of the directory %s failed" % p)
+    else:
+        print ("Successfully created the directory %s " % p)
+
+def remove_folder(p):
+    try:
+        for root, dirs, files in os.walk(p, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(p)
+    except OSError:
+        print ("removing the directory %s has failed" % p)
+    else:
+        print ("Successfully removed the directory %s " % p)
+
+def read_input_file(args, log):
+    _list = pd.read_csv(args.input, compression='infer', sep ='\t', na_values='NA')
+
+    if not set(['FILE','TYPE','SPREV','PPREV']).issubset(set(_list)):
+        raise ValueError('--input file header must contain following column names: FILE, TYPE, SPREV, PPREV')
+    if not set(['NAME']).issubset(set(_list)):
+        _list.loc[:,'NAME'] = ['trait_'+str(i) for i in range(len(_list.index))]
+
+    _list.loc[:,'sumstats'] =  _list.loc[:,'NAME'] + '.sumstats.gz'
+    _list.loc[:,'sumstat_path'] = [os.path.join(args.temp,_list.loc[ind,'sumstats']) for ind in _list.index]
+    
+    return(_list)
+    
+
+def process_summary_statistics(args, log):
+    def _read_intercept(f):
+        if not os.path.isfile(f):
+            raise ValueError('{} not exist'.format(f))
+        with open(f, 'rb') as fin:
+            for line in fin:
+                if 'Intercept: ' in line:
+                    intercept = float(line.split()[1])
+        return(intercept)
+
+    def _intercept_correction(inf, outf, a): 
+        d = pd.read_csv(inf, sep ='\t', index_col='SNP')
+        d.Z = d.Z / np.sqrt(a)
+        d.to_csv(outf, compression = 'gzip', index = True, header = True, sep = '\t')
+        return(d.index)
+
+    _list = read_input_file(args, log)
+    common_snps = None
+    for ind in _list.index:
+        args.icor = args.h2_log = args.h2 = args.samp_prev = args.pop_prev = None;
+        args.h2 = _list.loc[ind,'FILE'] 
+        if _list.loc[ind,'TYPE'] == 'binary':
+            if (_list.loc[ind,'SPREV'] == np.nan):
+                _list.loc[ind,'SPREV'] = None
+            if (_list.loc[ind,'PPREV'] == np.nan):
+                _list.loc[ind,'PPREV'] = None
+            if (args.samp_prev is not None) != (args.pop_prev is not None):
+                raise ValueError('Must set both or neither of --samp-prev and --pop-prev.')
+            args.samp_prev = _list.loc[ind,'SPREV'] 
+            args.pop_prev = _list.loc[ind,'PPREV']
+        else:
+            args.samp_prev = None
+            args.pop_prev = None
+        args.h2_log = os.path.join(args.temp, _list.loc[ind,'NAME'] + '.h2') 
+        ldsc_log = Logger(args.h2_log)
+        sumstats.estimate_h2(args, ldsc_log)
+        ldsc_log.log_fh.close()
+        intercept = _read_intercept(args.h2_log)
+        args.icor = os.path.join(args.temp, _list.loc[ind,'sumstats'])
+        snps = _intercept_correction(args.h2, args.icor, intercept)
+        if (common_snps is None):
+            common_snps = snps
+        else:
+            common_snps.intersection(snps)
+    pd.DataFrame(common_snps).to_csv(args.snps_outf, index = False, header = False, sep ='\t', compression = 'gzip')
+
+def estimate_sg(args, log):
+    def generate_ldsc_rg_input(_list):
+        n = len(_list.index)
+        niter = n*(n-1)+n
+        _rg_list = pd.DataFrame(columns = ['A_ind','B_ind','SPREV','PPREV'])
+        sg = pd.DataFrame([[0.0]*n]*n, index = list(_list.loc[:,'NAME']), columns = list(_list.loc[:,'NAME']))
+        ce = pd.DataFrame([[0.0]*n]*n, index = list(_list.loc[:,'NAME']), columns = list(_list.loc[:,'NAME']))
+        _list.set_index('NAME', inplace = True)
+        for i in range(n):
+            indice = _list.index 
+            A_ind = indice[i]
+            for B_ind in indice[i:]:
+                A = _list.loc[A_ind,'sumstat_path']
+                B = _list.loc[B_ind,'sumstat_path']
+                add_ind = A+','+B
+                _rg_list.loc[add_ind] = [A_ind] + [B_ind] + [str(_list.loc[A_ind,'SPREV'])+','+str(_list.loc[B_ind,'SPREV'])] + [str(_list.loc[A_ind,'PPREV'])+','+str(_list.loc[B_ind,'PPREV'])]
+        return(_rg_list, sg, ce)
+
+    def _read_results(f):
+        if not os.path.isfile(f):
+            raise ValueError('{} not exist'.format(f))
+        with open(f, 'rb') as fin:
+            while 1:
+                line = fin.readline()
+                if not line:
+                    break
+                elif 'Total Liability scale gencov:' in line:
+                    genetic_covariance = float(line.split()[4])
+                elif 'Summary of Genetic Correlation Results' in line:
+                    fin.readline()
+                    genetic_covariance_intercept = fin.readline().split()[10]
+        return(genetic_covariance_intercept, genetic_covariance)
+
+    _list = read_input_file(args, log)
+
+    _rg_list, sg, ce = generate_ldsc_rg_input(_list)
+    for ind in _rg_list.index:
+        args.rg = ind
+        args.samp_prev = _rg_list.loc[ind, 'SPREV']
+        args.pop_prev = _rg_list.loc[ind, 'SPREV']
+        args.r2_log = os.path.join(args.temp, 'ldsc.rg')
+        ldsc_log = Logger(args.r2_log)
+        sumstats.estimate_rg(args, ldsc_log)
+        ldsc_log.log_fh.close()
+        gencov_int, gencov = _read_results(args.r2_log) 
+        sg.loc[_rg_list.loc[ind, 'A_ind'], _rg_list.loc[ind, 'B_ind']] = sg.loc[_rg_list.loc[ind, 'B_ind'], _rg_list.loc[ind, 'A_ind']] = gencov
+        ce.loc[_rg_list.loc[ind, 'A_ind'], _rg_list.loc[ind, 'B_ind']] = ce.loc[_rg_list.loc[ind, 'B_ind'], _rg_list.loc[ind, 'A_ind']] = gencov_int
+    sg.to_csv(args.sg_outf, index = False, header = True, sep ='\t', compression = 'gzip')
+    ce.to_csv(args.ce_outf, index = False, header = True, sep ='\t', compression = 'gzip')
+
+def generate_pleio_input(args, log):
+    _list = read_input_file(args, log)
+
+    SNP = pd.read_csv(args.snps_outf, index_col = 0, header = None).index.values
+    metain_colnames = list()
+    for ind in _list.index:
+        for kind in ['beta','se']:
+            metain_colnames += [_list.loc[ind,'NAME'] + '_' + kind]
+    metain = pd.DataFrame(index = SNP, columns = metain_colnames)
+    metain.index.name = 'SNP'
+    for ind in _list.index:
+        dat = pd.read_csv(_list.loc[ind,'sumstat_path'], sep ='\t', index_col='SNP')
+        se = np.sqrt(1/dat.loc[SNP,'N'])
+        beta = dat.loc[SNP,'Z'] * se
+        metain.loc[:,_list.loc[ind,'NAME'] + '_beta'] = beta
+        metain.loc[:,_list.loc[ind,'NAME'] + '_se'] = se
+    metain.dropna(axis = 0, how = 'any', inplace = True)
+    metain.to_csv(args.metain_outf, index = True, header = True, sep = '\t', compression = 'gzip') 
+    
+
+def preprocess(args, log):
+    args.temp = os.path.join(args.out,'temp')
+    args.snps_outf = os.path.join(args.out, 'snps.txt.gz')
+    args.sg_outf = os.path.join(args.out, 'sg.txt.gz')
+    args.ce_outf = os.path.join(args.out, 'ce.txt.gz')
+    args.metain_outf = os.path.join(args.out, 'metain.txt.gz')
+
+    create_folder(args.temp)
+
+    process_summary_statistics(args, log)
+    estimate_sg(args, log)
+    generate_pleio_input(args, log)
+
+    remove_folder(args.temp)
+
+
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--out', default='processed',type=str,
+    help='Output file directory name. If --out is not set, PLEIO will use out as the '
+    'default output directory.')
+# Basic Flags for PLEIO-preprocess
+parser.add_argument('--input', default=None, type=str,
+    help='Filename for a .txt[.gz] file for preprocessing PLEIO analysis.. '
+    '--in requires at minimum also setting the --ref-ld and --w-ld flags.')
+# Basic Flags for Working with Variance Components
+parser.add_argument('--ref-ld', default=None, type=str,
+    help='Use --ref-ld to tell LDSC which LD Scores to use as the predictors in the LD '
+    'Score regression. '
+    'LDSC will automatically append .l2.ldscore/.l2.ldscore.gz to the filename prefix.')
+parser.add_argument('--ref-ld-chr', default=None, type=str,
+    help='Same as --ref-ld, but will automatically concatenate .l2.ldscore files split '
+    'across 22 chromosomes. LDSC will automatically append .l2.ldscore/.l2.ldscore.gz '
+    'to the filename prefix. If the filename prefix contains the symbol @, LDSC will '
+    'replace the @ symbol with chromosome numbers. Otherwise, LDSC will append chromosome '
+    'numbers to the end of the filename prefix.'
+    'Example 1: --ref-ld-chr ld/ will read ld/1.l2.ldscore.gz ... ld/22.l2.ldscore.gz'
+    'Example 2: --ref-ld-chr ld/@_kg will read ld/1_kg.l2.ldscore.gz ... ld/22_kg.l2.ldscore.gz')
+parser.add_argument('--w-ld', default=None, type=str,
+    help='Filename prefix for file with LD Scores with sum r^2 taken over SNPs included '
+    'in the regression. LDSC will automatically append .l2.ldscore/.l2.ldscore.gz.')
+parser.add_argument('--w-ld-chr', default=None, type=str,
+    help='Same as --w-ld, but will read files split into 22 chromosomes in the same '
+    'manner as --ref-ld-chr.')
+parser.add_argument('--overlap-annot', default=False, action='store_true',
+    help='This flag informs LDSC that the partitioned LD Scores were generates using an '
+    'annot matrix with overlapping categories (i.e., not all row sums equal 1), '
+    'and prevents LDSC from displaying output that is meaningless with overlapping categories.')
+parser.add_argument('--print-coefficients',default=False,action='store_true',
+    help='when categories are overlapping, print coefficients as well as heritabilities.')
+parser.add_argument('--frqfile', type=str,
+    help='For use with --overlap-annot. Provides allele frequencies to prune to common '
+    'snps if --not-M-5-50 is not set.')
+parser.add_argument('--frqfile-chr', type=str,
+    help='Prefix for --frqfile files split over chromosome.')
+parser.add_argument('--no-intercept', action='store_true',
+    help = 'If used with --h2, this constrains the LD Score regression intercept to equal '
+    '1. If used with --rg, this constrains the LD Score regression intercepts for the h2 '
+    'estimates to be one and the intercept for the genetic covariance estimate to be zero.')
+parser.add_argument('--intercept-h2', action='store', default=None,
+    help = 'Intercepts for constrained-intercept single-trait LD Score regression.')
+parser.add_argument('--intercept-gencov', action='store', default=None,
+    help = 'Intercepts for constrained-intercept cross-trait LD Score regression.'
+    ' Must have same length as --rg. The first entry is ignored.')
+parser.add_argument('--M', default=None, type=str,
+    help='# of SNPs (if you don\'t want to use the .l2.M files that came with your .l2.ldscore.gz files)')
+parser.add_argument('--two-step', default=None, type=float,
+    help='Test statistic bound for use with the two-step estimator. Not compatible with --no-intercept and --constrain-intercept.')
+parser.add_argument('--chisq-max', default=None, type=float,
+    help='Max chi^2.')
+
+# Flags for both LD Score estimation and h2/gencor estimation
+parser.add_argument('--print-cov', default=False, action='store_true',
+    help='For use with --h2/--rg. This flag tells LDSC to print the '
+    'covaraince matrix of the estimates.')
+parser.add_argument('--print-delete-vals', default=False, action='store_true',
+    help='If this flag is set, LDSC will print the block jackknife delete-values ('
+    'i.e., the regression coefficeints estimated from the data with a block removed). '
+    'The delete-values are formatted as a matrix with (# of jackknife blocks) rows and '
+    '(# of LD Scores) columns.')
+
+# Flags you should almost never use
+parser.add_argument('--invert-anyway', default=False, action='store_true',
+    help="Force LDSC to attempt to invert ill-conditioned matrices.")
+parser.add_argument('--n-blocks', default=200, type=int,
+    help='Number of block jackknife blocks.')
+parser.add_argument('--not-M-5-50', default=False, action='store_true',
+    help='This flag tells LDSC to use the .l2.M file instead of the .l2.M_5_50 file.')
+parser.add_argument('--return-silly-things', default=False, action='store_true',
+    help='Force ldsc to return silly genetic correlation estimates.')
+parser.add_argument('--no-check-alleles', default=False, action='store_true',
+    help='For rg estimation, skip checking whether the alleles match. This check is '
+    'redundant for pairs of chisq files generated using munge_sumstats.py and the '
+    'same argument to the --merge-alleles flag.')
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    if args.out is None:
+        raise ValueError('--out is required');
+    
+    create_folder(args.out)
+    log = Logger(os.path.join(args.out,'log.txt'));
+
+    try:
+        defaults = vars(parser.parse_args(''));
+        opts = vars(args);
+        non_defaults = [x for x in opts.keys() if opts[x] != defaults[x]];
+        header = MASTHEAD;
+        header += 'Call: \n';
+        header += './preprocess.py \\\n';
+        options = ['--'+x.replace('_','-')+' '+str(opts[x])+' \\' for x in non_defaults];
+        header += '\n'.join(options).replace('True','').replace('False','');
+        header = header[0:-1]+'\n';
+        log.log(header);
+        log.log('Beginning analysis at {T}'.format(T=time.ctime()));
+        start_time = time.time()
+
+        if args.n_blocks <= 1:
+            raise ValueError('--n-blocks must be an integer > 1.')
+        elif args.input and (args.ref_ld or args.ref_ld_chr) and (args.w_ld or args.w_ld_chr):
+            if args.ref_ld and args.ref_ld_chr:
+                raise ValueError('Cannot set both --ref-ld and --ref-ld-chr.')
+            if args.w_ld and args.w_ld_chr:
+                raise ValueError('Cannot set both --w-ld and --w-ld-chr.')
+        
+            if not args.overlap_annot or args.not_M_5_50:
+                if args.frqfile is not None or args.frqfile_chr is not None:
+                    log.log('The frequency file is unnecessary and is being ignored.')
+                    args.frqfile = None
+                    args.frqfile_chr = None
+            if args.overlap_annot and not args.not_M_5_50:
+                if not ((args.frqfile and args.ref_ld) or (args.frqfile_chr and args.ref_ld_chr)):
+                    raise ValueError('Must set either --frqfile and --ref-ld or --frqfile-chr and --ref-ld-chr')
+            preprocess(args,log)
+        else:
+            print header
+            print 'Error: no analysis selected.'
+            print 'preprocess.py -h describes options.'
+    except Exception:
+        ex_type, ex, tb = sys.exc_info()
+        log.log( traceback.format_exc(ex) )
+        raise
+    finally:
+        log.log('Analysis finished at {T}'.format(T=time.ctime()) )
+        time_elapsed = round(time.time()-start_time,2)
+        log.log('Total time elapsed: {T}'.format(T=sec_to_str(time_elapsed)))
+
+## Sg and Rn should have same dimension
