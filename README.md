@@ -21,7 +21,7 @@ In order to run `pleio`, the following python dependencies must be installed in 
 Once the above has completed, you can run the following command:
 
 ```
-./pleio.py -h
+./pleio -h
 ```
 ## Tutorial 
 If you want to try a joint analysis of 18 characteristics of cardiovascular diseases using the PLEIO framework, please use the following [link](https://github.com/hanlab-SNU/pleio/wiki/Identification-of-pleiotropic-loci-with-PLEIO)
