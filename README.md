@@ -23,6 +23,32 @@ Once the above has completed, you can run the following command:
 ```
 ./pleio -h
 ```
+
+## Updating PLEIO
+You can update to the newest version of `PLEIO` using git. First, navigate to your pleio/ directory (e.g., cd pleio), then run
+```
+git pull
+```
+If `PLEIO` is up to date, you will see
+```
+Already up-to-date.
+```
+otherwise, you will see `git` output similar to 
+```
+remote: Enumerating objects: 9, done.
+remote: Counting objects: 100% (9/9), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 6 (delta 4), reused 5 (delta 3), pack-reused 0
+Unpacking objects: 100% (6/6), done.
+From git://github.com/hanlab-SNU/pleio
+   e065a06..14c3399  master     -> origin/master
+Updating e065a06..14c3399
+Fast-forward
+ README.md       | 2 +-
+ ldsc_preprocess | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+```
+
 ## Tutorial 
 If you want to try a joint analysis of 18 characteristics of cardiovascular diseases using the PLEIO framework, please use the following [link](https://github.com/hanlab-SNU/pleio/wiki/Identification-of-pleiotropic-loci-with-PLEIO)
 
