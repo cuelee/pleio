@@ -227,7 +227,7 @@ def generate_pleio_input(args, log):
             cfactor = estim_cfactor(_list.loc[ind,'SPREV'], _list.loc[ind,'PPREV']);
         else: 
             cfactor = 1;
-        se = np.sqrt(1/dat.loc[SNP,'N']) * cca.cfactor
+        se = np.sqrt(1/dat.loc[SNP,'N']) * cfactor
         beta = dat.loc[SNP,'Z'] * se
         metain.loc[:,_list.loc[ind,'NAME'] + '_beta'] = beta
         metain.loc[:,_list.loc[ind,'NAME'] + '_se'] = se
