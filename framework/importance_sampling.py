@@ -197,9 +197,7 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-1
     null_D = np.diag([1]*n).dot(Ce).dot(np.diag([1]*n))
     Uinv_sqrt = sqrt_ginv(U);
     K = np.transpose(Uinv_sqrt).dot(D).dot(Uinv_sqrt)
-    print(K)
     w, v = np.linalg.eigh(K); t_v = np.transpose(v)
-    print(w,v)
     pos = w > tol
     w_pos = w[pos]; t_v_pos = t_v[pos]
 	
