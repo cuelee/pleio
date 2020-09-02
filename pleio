@@ -135,7 +135,7 @@ def read_input(infile, sgf, cef):
     metain_df = pd.read_csv(infile, sep='\t', compression = 'infer', index_col = ['SNP'])
     col = metain_df.columns.tolist()
     include = [col[i].split('_beta')[0] for i in range(len(col)) if i % 2 == 0]
-    N_gwas = (metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]]).apply(lambda x: np.mean(1/float(x)**2))
+    N_gwas = (metain_df.loc[:,[col[i] for i in range(len(col)) if i % 2 != 0]]).apply(lambda x: np.mean(1/x**2))
     error_correlation_df = read_mat(cef,include,'error correlation matrix');
     genetic_covariance_df = read_mat(sgf,include,'genetic covariance matrix');
     meta_cain = meta_class_array_object_generator(metain_df, genetic_covariance_df, error_correlation_df, N_gwas, include)
