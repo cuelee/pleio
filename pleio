@@ -11,6 +11,7 @@ PLEIO is command line framework to perform cross-disease meta-analyses
 from framework.parse import *
 from framework.importance_sampling import importance_sampling
 from framework.significance_estimation import cof_estimation, pvalue_estimation, pval_flattening 
+from framework.blup_estimation import blup_optimization
 from meta_code.variance_component import vcm_optimization
 from meta_code.LS import LS, LS_p 
 import numpy as np
@@ -98,16 +99,42 @@ def _estimate_statistics(df_data, Sg, Ce, isf):
     ind = [i*2 for i in range(n)]
     sqrt_Sg_ginv = sqrt_ginv(Sg) 
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['pleio_stat'] = df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, Ce, ind), axis=1)
+    df_out = df_out.merge(df_data.apply(lambda x: run_vc_optimizer(x.tolist(), sqrt_Sg_ginv, Ce, ind), result_type = 'expand', axis=1), left_index = True, right_index = True)
     df_out['LS_stat'] = df_data.apply(lambda x: LS_input_parser(x.tolist(), Ce, ind), axis=1)
     p_functions = cof_estimation(isf);
     df_out['pleio_p'] = df_out.loc[:,'pleio_stat'].apply(lambda x: pvalue_estimation(x, p_functions));
     df_out['LS_p'] = df_out.loc[:,'LS_stat'].apply(lambda x: LS_p(x));
     return(df_out)
 
-def _parallelize(meta_cain, func, args, isf): 
+def _pleio_parallelize(meta_cain, func, args, isf): 
     data_split = np.array_split(meta_cain.metain, int(args.ncores))
     iterable = product(data_split, [meta_cain.Sg.values], [meta_cain.Ce.values], [isf])
+    pool = mp.Pool(int(args.ncores))
+    df_output = pd.concat(pool.starmap(func, iterable))
+    pool.close()
+    pool.join()
+    return(df_output)
+
+def run_blup_optimizer(x, Sg, Ce, ind, c):
+    y = np.array([x[i] for i in ind]);
+    se = np.array([x[i+1] for i in ind]);
+    tausq = np.array(x[-1])
+    G = np.multiply(tausq, Sg) 
+    R = np.diag(se).dot(Ce).dot(np.diag(se))
+    return(blup_optimization(y,G,R,c))
+
+def _estimate_blup(df_data, Sg, Ce, colnames):
+    n = np.size(Sg,1)
+    c = colnames
+    ind = [i*2 for i in range(n)]
+    df_out = pd.DataFrame(index = df_data.index)
+    df_out = df_out.merge(df_data.apply(lambda x: run_blup_optimizer(x.tolist(), Sg, Ce, ind, c), result_type = 'expand', axis=1), left_index = True, right_index = True)
+    return(df_out)
+
+def _blup_parallelize(summary, meta_cain, func, args):
+    data_df = meta_cain.metain.merge(summary.loc[:,'tausq'], how = 'inner', left_index = True, right_index = True)
+    data_split = np.array_split(data_df, int(args.ncores))
+    iterable = product(data_split, [meta_cain.Sg.values], [meta_cain.Ce.values],[meta_cain.Sg.columns])
     pool = mp.Pool(int(args.ncores))
     df_output = pd.concat(pool.starmap(func, iterable))
     pool.close()
@@ -154,16 +181,23 @@ def pleio(args,log):
     else:
         quit('The feature has not been supported yet');
         
-    summary = _parallelize(meta_cain, _estimate_statistics, args, importance_sampling_f);
+    summary = _pleio_parallelize(meta_cain, _estimate_statistics, args, importance_sampling_f);
 
     if args.pvalue_flattening:
         summary = pval_flattening(summary, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, args.ncores ,importance_sampling_f )
         #pval_flattening(summary, meta_cain.N_gwas, meta_cain.Sg, meta_cain.Ce, args.ncores ,importance_sampling_f )
     
+    log.log('Writing PLEIO output file');
     out_path = os.path.join(outdir+'.txt.gz');
     summary.to_csv(out_path, index = True, sep='\t', compression='gzip');
 
-    quit('work done')
+    if args.blup:
+        log.log('Estimating BLUP');
+        blup_estimates = _blup_parallelize(summary, meta_cain, _estimate_blup, args);
+        blup_estimates.to_csv(outdir+'.blup.gz', index = True, sep ='\t', compression = 'gzip')
+
+
+    log.log('Work done');
 
 
 parser = argparse.ArgumentParser()
@@ -183,6 +217,9 @@ parser.add_argument('--create', default = False, action='store_true',
     help='If this flag is set, PLEIO will run importance sampling and create new isf. ')
 parser.add_argument('--nis', default = int(100000), type = int,
     help='Number of samples for importance sampling. ')
+parser.add_argument('--blup', default = False, action='store_true',
+    help='If this flag is set, PLEIO will estimate Best Linear Unbiased Prediction (BLUP)'
+    'and write [output].blup.gz')
 parser.add_argument('--pvalue_flattening', default = False, action= 'store_true',
     help='Flattening p-value distribution. This is necessary if you want to check lambda GC')
 parser.add_argument('--parallel', default = False, action='store_true',
