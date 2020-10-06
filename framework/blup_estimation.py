@@ -9,6 +9,6 @@ def blup_optimization(y, G, R, c):
     if(no.count_nonzero(pinv_G) > 0):
         u_se = np.sqrt(np.diag(V))
         return(pd.Series([item for sublist in zip(u, u_se) for item in sublist], index = [item for sublist in zip([a + '_beta' for a in c],[a + '_se' for a in c]) for item in sublist]) )
-    else
+    else:
         return(pd.Series([item for sublist in zip(u,[-9]*len(u)) for item in sublist], index = [item for sublist in zip([a + '_beta' for a in c],[a + '_se' for a in c]) for item in sublist]))
 
