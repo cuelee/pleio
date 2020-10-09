@@ -11,7 +11,7 @@ PLEIO is command line framework to perform cross-disease meta-analyses
 from framework.parse import *
 from framework.importance_sampling import importance_sampling
 from framework.significance_estimation import cof_estimation, pvalue_estimation, pval_flattening 
-from framework.blup_estimation import blup_optimization
+from framework.mtag_estimation import mtag
 from meta_code.variance_component import vcm_optimization
 from meta_code.LS import LS, LS_p 
 import numpy as np
@@ -121,7 +121,7 @@ def run_blup_optimizer(x, Sg, Ce, ind, c):
     tausq = np.array(x[-1])
     G = np.multiply(tausq, Sg) 
     R = np.diag(se).dot(Ce).dot(np.diag(se))
-    return(blup_optimization(y,G,R,c))
+    return(mtag(y,G,R,c))
 
 def _estimate_blup(df_data, Sg, Ce, colnames):
     n = np.size(Sg,1)
