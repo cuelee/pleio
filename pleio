@@ -118,7 +118,7 @@ def _pleio_parallelize(meta_cain, func, args, isf):
 def run_blup_optimizer(x, Sg, Ce, ind, c):
     y = np.array([x[i] for i in ind]);
     se = np.array([x[i+1] for i in ind]);
-    tausq = np.array(x[-1])
+    tausq = np.max(np.array([10**-12,x[-1]]))
     G = np.multiply(tausq, Sg) 
     R = np.diag(se).dot(Ce).dot(np.diag(se))
     return(mtag(y,G,R,c))
