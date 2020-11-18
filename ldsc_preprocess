@@ -209,12 +209,12 @@ def generate_pleio_input(args, log):
         K=float(pprev)
         P=float(sprev)
         t = stats.norm.isf(K)
-        z = stats.norm.pdf(thres)
+        z = stats.norm.pdf(t)
         i = z/K 
         # i2 = -i*K / (1-K)
         cfac = (K*(1-K))**2/(z**2*P*(1-P))
         lamb = (P-K)/(1-K)
-        theta = i*lamb*(t-i*lamb)
+        theta = i*lamb*(i*lamb-t)
         return(cfac, theta)
 
     _list = read_input_file(args, log)
@@ -231,9 +231,11 @@ def generate_pleio_input(args, log):
         if _list.loc[ind,'TYPE'] == 'binary':
             cfac, theta = estim_cfactors(_list.loc[ind,'SPREV'], _list.loc[ind,'PPREV']);
             se_cc = np.sqrt(1/dat.loc[SNP,'N'])
-            se = np.sqrt(cfac) * se_cc / np.sqrt(1 + cfac * theta * se_cc**2)
+            beta = np.sqrt(cfac) * (dat.loc[SNP,'Z'] * se_cc) / np.sqrt(1 + cfac * theta * (dat.loc[SNP,'Z'] * se_cc)**2)
+            se = beta/dat.loc[SNP,'Z']
         else: 
-        beta = dat.loc[SNP,'Z'] * se
+            se = np.sqrt(1/dat.loc[SNP,'N'])
+            beta = dat.loc[SNP,'Z'] * se
         metain.loc[:,_list.loc[ind,'NAME'] + '_beta'] = beta
         metain.loc[:,_list.loc[ind,'NAME'] + '_se'] = se
     metain.dropna(axis = 0, how = 'any', inplace = True)

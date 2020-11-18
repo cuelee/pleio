@@ -12,10 +12,10 @@ def LL_fun(x,n,sq,w):
     return(-0.5*(n*np.log(2*np.pi)+sum(np.log(w+x))+sum(sq/(w+x))));
 
 def LLp_fun(x,sq,w):
-    return(0.5*(sum(1/(w+x))-sum(sq/(w+x)**2)));
+    return(-0.5*(sum(1/(w+x))-sum(sq/(w+x)**2)));
 
 def LLdp_fun(x,sq, w):
-    return(-0.5*(sum(1/(w+x)**2)-2*sum(sq/(w+x)**3)));
+    return(-0.5*(-sum(1/(w+x)**2)+2*sum(sq/(w+x)**3)));
 
 def NR_root(f, df, x, sq, w, i = 0, iter_max = 10000, tol = 2.22044604925e-16**0.5):
     '''
