@@ -18,7 +18,7 @@ In order to run `pleio`, the following python dependencies must be installed in 
 - numpy = v.1.16.4
 - scipy >= v.1.4.1
 
-This can be done by creating Anaconda environment via the following command:
+To install Python dependencies, you need to install Anaconda from [LINK](https://www.anaconda.com). After installing Anaconda, run the following command to create an environment with pleio's dependencies.
 ```
 conda env create -f environment.yml
 conda activate pleio
