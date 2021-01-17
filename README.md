@@ -15,7 +15,7 @@ In order to run `pleio`, the following python dependencies must be installed in 
 
 - python >= 3.7.4
 - pandas >= 1.0.4
-- numpy >= v.1.18.1
+- numpy = v.1.16.4
 - scipy >= v.1.4.1
 
 Once the above has completed, you can run the following command:
