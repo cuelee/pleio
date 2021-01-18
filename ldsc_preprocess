@@ -155,6 +155,7 @@ def process_summary_statistics(args, log):
     pd.DataFrame(common_snps).to_csv(args.snps_outf, index = False, header = False, sep ='\t', compression = 'gzip')
 
 def estimate_sg(args, log):
+
     def generate_ldsc_rg_input(_list):
         n = len(_list.index)
         niter = n*(n-1)+n
@@ -205,17 +206,30 @@ def estimate_sg(args, log):
     ce.to_csv(args.ce_outf, index = False, header = True, sep ='\t', compression = 'gzip')
 
 def generate_pleio_input(args, log):
+    def gen_beta(Z_obs, N_obs, alpha, theta):
+        if (Z_obs == 0):
+            return(float(0.0))
+        se_std = np.sqrt(1/N_obs)
+        beta_std = Z_obs * se_std
+        return( np.sqrt(alpha) * beta_std / np.sqrt(1-alpha*theta*beta_std**2) )
+    
+    def gen_se(beta, Z_obs, N_obs):
+        if (Z_obs == 0):
+            return(np.sqrt(1/N_obs))
+        return( beta / Z_obs )
+
     def estim_cfactors(sprev, pprev):
         K=float(pprev)
         P=float(sprev)
+
         t = stats.norm.isf(K)
-        z = stats.norm.pdf(t)
+        z = stats.norm.pdf(t,0,1)
         i = z/K 
         # i2 = -i*K / (1-K)
-        cfac = (K*(1-K))**2/(z**2*P*(1-P))
         lamb = (P-K)/(1-K)
-        theta = i*lamb*(i*lamb-t)
-        return(cfac, theta)
+        theta = (i*lamb)*(t-i*lamb)
+        alpha = (K*(1-K))**2/(P*(1-P)*z**2)
+        return(alpha, theta)
 
     _list = read_input_file(args, log)
 
@@ -228,16 +242,21 @@ def generate_pleio_input(args, log):
     metain.index.name = 'SNP'
     for ind in _list.index:
         dat = pd.read_csv(_list.loc[ind,'sumstat_path'], sep ='\t', index_col='SNP')
+        out = pd.DataFrame(data = None,  index = SNP, columns = ['beta','se','Z','N'])
+        out.loc[SNP,'Z'] = dat.loc[SNP,'Z']; out.loc[SNP,'N'] = dat.loc[SNP,'N']
+        del dat
+
         if _list.loc[ind,'TYPE'] == 'binary':
-            cfac, theta = estim_cfactors(_list.loc[ind,'SPREV'], _list.loc[ind,'PPREV']);
-            se_cc = np.sqrt(1/dat.loc[SNP,'N'])
-            beta = np.sqrt(cfac) * (dat.loc[SNP,'Z'] * se_cc) / np.sqrt(1 + cfac * theta * (dat.loc[SNP,'Z'] * se_cc)**2)
-            se = beta/dat.loc[SNP,'Z']
+            alpha, theta = estim_cfactors(_list.loc[ind,'SPREV'], _list.loc[ind,'PPREV']);
+
+            out.loc[SNP,'beta'] = out.loc[SNP,['Z','N']].apply(lambda l: gen_beta(Z_obs = float(l['Z']), N_obs = float(l['N']), alpha = alpha, theta = theta), axis = 1 ) 
+            out.loc[SNP,'se'] = out.loc[SNP,['beta','Z','N']].apply(lambda l: gen_se(beta=float(l['beta']), Z_obs=float(l['Z']), N_obs=float(l['N'])),axis=1)
         else: 
-            se = np.sqrt(1/dat.loc[SNP,'N'])
-            beta = dat.loc[SNP,'Z'] * se
-        metain.loc[:,_list.loc[ind,'NAME'] + '_beta'] = beta
-        metain.loc[:,_list.loc[ind,'NAME'] + '_se'] = se
+            out.loc[SNP,'se'] =  [np.sqrt(1/i) for i in out.loc[SNP,'N'].values]
+            out.loc[SNP,'beta'] = out['Z']*out['se']
+        metain.loc[:,_list.loc[ind,'NAME'] + '_beta'] = out.beta
+        metain.loc[:,_list.loc[ind,'NAME'] + '_se'] = out.se
+        del out
     metain.dropna(axis = 0, how = 'any', inplace = True)
     metain.to_csv(args.metain_outf, index = True, header = True, sep = '\t', compression = 'gzip') 
     
