@@ -207,7 +207,7 @@ def estimate_sg(args, log):
     ce.to_csv(args.ce_outf, index = False, header = True, sep ='\t', compression = 'gzip')
 
 def generate_pleio_input(args, log):
-    log.log('Standardizing the effect size of summary statistical data'.format(sum(dupl)))
+    log.log('Standardizing the effect size of summary statistical data')
     def gen_beta(Z_obs, N_obs, alpha, theta):
         if (Z_obs == 0):
             return(float(0.0))
