@@ -265,7 +265,7 @@ def generate_pleio_input(args, log):
         metain.loc[:,_list.loc[ind,'NAME'] + '_se'] = out.se
         del out
     metain.dropna(axis = 0, how = 'any', inplace = True)
-    log.log('Writing PLEIO input files')
+    log.log('Writing {} '.format(args.metain_outf))
     metain.to_csv(args.metain_outf, index = True, header = True, sep = '\t', compression = 'gzip') 
     
 
