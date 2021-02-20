@@ -237,7 +237,7 @@ def generate_pleio_input(args, log):
     df = pd.read_csv(args.snps_outf, index_col = 0, header = None)
     dupl = df.index.duplicated()
     log.log('Removed {} duplicated SNPs'.format(sum(dupl)))
-    SNP = df.loc[~dupl]
+    SNP = df.loc[~dupl].index.values
     del(df)
 
     metain_colnames = list()
