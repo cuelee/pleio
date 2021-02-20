@@ -193,8 +193,9 @@ def estimate_sg(args, log):
     _rg_list, sg, ce = generate_ldsc_rg_input(_list)
     for ind in _rg_list.index:
         args.rg = ind
+        args.no_check_alleles=True
         args.samp_prev = _rg_list.loc[ind, 'SPREV']
-        args.pop_prev = _rg_list.loc[ind, 'SPREV']
+        args.pop_prev = _rg_list.loc[ind, 'PPREV']
         args.r2_log = os.path.join(args.temp, 'ldsc.rg')
         ldsc_log = Logger(args.r2_log)
         sumstats.estimate_rg(args, ldsc_log)
