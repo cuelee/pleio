@@ -234,7 +234,12 @@ def generate_pleio_input(args, log):
 
     _list = read_input_file(args, log)
 
-    SNP = pd.read_csv(args.snps_outf, index_col = 0, header = None).index.values
+    df = pd.read_csv(args.snps_outf, index_col = 0, header = None)
+    dupl = df.index.duplicated()
+    log.log('Removed {} duplicated SNPs',format(sum(dupl)))
+    SNP = df.loc[~dupl]
+    del(df)
+
     metain_colnames = list()
     for ind in _list.index:
         for kind in ['beta','se']:
