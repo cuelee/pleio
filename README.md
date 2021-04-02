@@ -57,12 +57,12 @@ Fast-forward
 ```
 
 ## Tutorial 
-If you want to try a joint analysis of 18 characteristics of cardiovascular diseases using the PLEIO framework, please use the following [link](https://github.com/hanlab-SNU/pleio/wiki/Identification-of-pleiotropic-loci-with-PLEIO)
+If you want to try a joint analysis of 18 characteristics of cardiovascular diseases using the PLEIO framework, please use the following [Link](https://github.com/hanlab-SNU/pleio/wiki/Identification-of-pleiotropic-loci-with-PLEIO)
 
 ## Citation
 
 If you use the software, please cite  
-Lee, C. H., Shi, H., Pasaniuc, B., Eskin, E., & Han, B. (2021). PLEIO: a method to map and interpret pleiotropic loci with GWAS summary statistics. The American Journal of Human Genetics, 108(1), 36–48.
+Lee, C. H., Shi, H., Pasaniuc, B., Eskin, E., & Han, B. (2021). PLEIO: a method to map and interpret pleiotropic loci with GWAS summary statistics. The American Journal of Human Genetics, 108(1), 36–48. [Link](https://doi.org/10.1016/j.ajhg.2020.11.017)
 
 ## Support
 
