@@ -10,19 +10,22 @@ import multiprocessing as mp
 from itertools import product
 from decimal import *
 from scipy.stats import multivariate_normal as MVN
-from numpy.linalg.linalg import _makearray, asarray, _isEmpty2d, empty, svd, divide, matmul, newaxis, amax, transpose, multiply
 
-### vcm_optimization for IS 
+### Optimization of Variance Component Model for importance sampling process (Lightweight code) 
 def LL_fun(x,n,P_sq,w):
+    'Log Likelihood Function of PLEIO statistic'
     return(-0.5*(n*np.log(2*np.pi)+sum(np.log(w+x))+sum(P_sq/(w+x))));
 
 def LLp_fun(x,P_sq,w):
+    'Log Likelihood Function derivative to x'
     return(0.5*(sum(1/(w+x))-sum(P_sq/(w+x)**2)));
 
 def LLdp_fun(x,P_sq, w):
+    'Log Likelihood Function derivative to x^2'
     return(-0.5*(sum(1/(w+x)**2)-2*sum(P_sq/(w+x)**3)));
 
 def NR_root(f, df, x, P_sq, w, i = 0, iter_max = 10000, tol = 2.22044604925e-16**0.5):
+    'Newton Raphson Method implemented in PLEIO'
     while ( abs(f(x,P_sq,w)) > tol ):
         x = x - f(x,P_sq,w) / df(x,P_sq,w);
         i = i + 1;
@@ -45,22 +48,35 @@ def vcm_optimization_IS (b, n, w, t_v , tol = 2.22044604925e-16**0.5):
         alt_ll = null_ll;
     return (- 2 * (null_ll - alt_ll))
 
+### Code that can compute the root square pseudo inverse. Created by modifying numpy.linalg.pinv
+def _makearray(a):
+    new = np.asarray(a)
+    wrap = getattr(a, "__array_prepare__", new.__array_wrap__)
+    return new, wrap
+
+def _is_empty_2d(arr):
+    # check size first for efficiency
+    return arr.size == 0 and np.product(arr.shape[-2:]) == 0
+
 def sqrt_ginv(a, rcond=1e-15):
     a, wrap = _makearray(a)
-    rcond = asarray(rcond)
-    if _isEmpty2d(a):
+    rcond = np.asarray(rcond)
+    if _is_empty_2d(a):
         m, n = a.shape[-2:]
-        res = empty(a.shape[:-2] + (n, m), dtype=a.dtype)
+        res = np.empty(a.shape[:-2] + (n, m), dtype=a.dtype)
         return wrap(res)
     a = a.conjugate()
-    u, s, vt = svd(a, full_matrices=False)
+    u, s, vt = np.linalg.svd(a, full_matrices=False, hermitian=True)
+
     # discard small singular values
-    cutoff = rcond[..., newaxis] * amax(s, axis=-1, keepdims=True)
+    cutoff = rcond[..., np.newaxis] * np.amax(s, axis=-1, keepdims=True)
     large = s > cutoff
-    s = divide(1, s**0.5, where=large, out=s)
+    s = np.divide(1, s**0.5, where=large, out=s)
     s[~large] = 0
-    res = matmul(transpose(vt), multiply(s[..., newaxis], transpose(u)))
+
+    res = np.matmul(np.transpose(vt), np.multiply(s[..., np.newaxis], np.transpose(u)))
     return wrap(res)
+###
 
 ### generate multi sampling distributions 
 def generate_P(mean, factor, D, n):
@@ -170,7 +186,6 @@ def thres_estimate_pvalue(thres, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
     IS_estim = sum( nominator[i] / denominator[i] for i in range(len( d_Q ))) /N + np.sum( betas );
     return(pd.DataFrame([IS_estim], columns = ['pvalue'], index = [thres]))
 
-
 def thres_parallelize(thres_vec, func, cores, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N):
     iterable = product(thres_vec, [Sdelpy], [Palpha], [alpha], [d_Q], [d_P], [nPj], [N])
     pool = mp.Pool(int(cores))
@@ -180,8 +195,9 @@ def thres_parallelize(thres_vec, func, cores, Sdelpy, Palpha, alpha, d_Q, d_P, n
     return(res_list)
 
 ## GenCor and RECor: np.matrix, N: int, outfn: str
-def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-16**0.5):
-    se = 1/(np.array(gwas_N)**0.5)
+def importance_sampling(N, GWAS_Nsamp, U, Ce, outf, mp_cores, tol = 2.22044604925e-16**0.5):
+    'Importance Sampling'
+    se = 1/(np.array(GWAS_Nsamp)**0.5)
 
     ### we set random seed 
     np.random.seed(1)
@@ -200,7 +216,7 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-1
     w, v = np.linalg.eigh(K); t_v = np.transpose(v)
     pos = w > tol
     w_pos = w[pos]; t_v_pos = t_v[pos]
-	
+
     ## PLEIO's importance sampling method reqiores probability densities to generate samples. They have means of [0] * n and the covariance matrix of c_Pj * Ce
     c_Pj = [1,1.1,1.2,1.3,1.4,1.7,2,2.5,3,4,5];
 
@@ -211,7 +227,7 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-1
     input_df = mixture_sampling(N, alpha, P)
     eta_df = input_df.multiply(se, axis = 1) 
     transformed_df = eta_df.apply(func = lambda x: Uinv_sqrt.dot(x), axis = 1, raw = True)
-    print( "Generating {len_X} stats.".format( len_X=N ) ); 
+    print( "Generating {len_X} stats (this calculation is expected to take a long time).".format( len_X=N ) ); 
     
     
     #data = ims_parallelize( input_df, ims_estimate_statistics, cores, partitions, n, w, t_v )
@@ -228,7 +244,7 @@ def importance_sampling(N, gwas_N, U, Ce, outf, mp_cores, tol = 2.22044604925e-1
     Palpha = vector_sum(const_mul(alpha,d_P));
    
     pvalue_df = thres_parallelize(thres_vec, thres_estimate_pvalue, cores, Sdelpy, Palpha, alpha, d_Q, d_P, nPj, N)
-    print('Completed estimating the inverse CDFs at different threshold values for PLEIO\'s variance component model.'); 
+    print('Complete CDF estimation for distributed component model.'); 
     
     sorted_pvalue = pvalue_df.sort_index()
     print(sorted_pvalue)

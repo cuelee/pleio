@@ -41,5 +41,6 @@ Thumbs.db
 ####################
 *.isf
 test_*
+*.ipynb
 
 .Rproj.user
