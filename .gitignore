@@ -44,5 +44,6 @@ Thumbs.db
 test_*
 *.ipynb
 ignore_*
+example*
 
 .Rproj.user
