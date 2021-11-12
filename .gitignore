@@ -40,6 +40,7 @@ Thumbs.db
 # PLEIO isf 
 ####################
 *.isf
+*.txt.gz
 test_*
 *.ipynb
 ignore_*
