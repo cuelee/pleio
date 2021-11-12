@@ -1,12 +1,10 @@
-'''
-    Copyright(C) 2018 Cue Hyunkyu Lee
-'''
 #!/bin/python3
 # dependency: numpy,scipy.stats, scipy.optimize,
 
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
+from framework.utilities import sqrt_ginv
 from itertools import product
 from decimal import *
 from scipy.stats import multivariate_normal as MVN
@@ -47,36 +45,6 @@ def vcm_optimization_IS (b, n, w, t_v , tol = 2.22044604925e-16**0.5):
         mle_tausq = 0;
         alt_ll = null_ll;
     return (- 2 * (null_ll - alt_ll))
-
-### Code that can compute the root square pseudo inverse. Created by modifying numpy.linalg.pinv
-def _makearray(a):
-    new = np.asarray(a)
-    wrap = getattr(a, "__array_prepare__", new.__array_wrap__)
-    return new, wrap
-
-def _is_empty_2d(arr):
-    # check size first for efficiency
-    return arr.size == 0 and np.product(arr.shape[-2:]) == 0
-
-def sqrt_ginv(a, rcond=1e-15):
-    a, wrap = _makearray(a)
-    rcond = np.asarray(rcond)
-    if _is_empty_2d(a):
-        m, n = a.shape[-2:]
-        res = np.empty(a.shape[:-2] + (n, m), dtype=a.dtype)
-        return wrap(res)
-    a = a.conjugate()
-    u, s, vt = np.linalg.svd(a, full_matrices=False, hermitian=True)
-
-    # discard small singular values
-    cutoff = rcond[..., np.newaxis] * np.amax(s, axis=-1, keepdims=True)
-    large = s > cutoff
-    s = np.divide(1, s**0.5, where=large, out=s)
-    s[~large] = 0
-
-    res = np.matmul(np.transpose(vt), np.multiply(s[..., np.newaxis], np.transpose(u)))
-    return wrap(res)
-###
 
 ### generate multi sampling distributions 
 def generate_P(mean, factor, D, n):
@@ -195,21 +163,22 @@ def thres_parallelize(thres_vec, func, cores, Sdelpy, Palpha, alpha, d_Q, d_P, n
     return(res_list)
 
 ## GenCor and RECor: np.matrix, N: int, outfn: str
-def importance_sampling(N, GWAS_Nsamp, U, Ce, outf, mp_cores, tol = 2.22044604925e-16**0.5):
+def importance_sampling(N_impsamp, GWAS_nsamples, U, Ce, output_filename, Ncores, tol = 2.22044604925e-16**0.5):
     'Importance Sampling'
-    se = 1/(np.array(GWAS_Nsamp)**0.5)
-
     ### we set random seed 
     np.random.seed(1)
+
+    se = 1/(np.array(GWAS_nsamples)**0.5)
+    N = N_impsamp
     
     ### set multi processing options 
-    if(mp_cores == 0):
+    if(Ncores == 0):
         cores = mp.cpu_count() - 1; partitions = cores;
     else:
-        cores = mp_cores; partitions = cores;
+        cores = Ncores; partitions = cores;
     
     ### set parameters
-    output_filename = outf; nstudy = len(se); n = nstudy; D = np.diag(se).dot(Ce).dot(np.diag(se));
+    nstudy = len(se); n = nstudy; D = np.diag(se).dot(Ce).dot(np.diag(se));
     null_D = np.diag([1]*n).dot(Ce).dot(np.diag([1]*n))
     Uinv_sqrt = sqrt_ginv(U);
     K = np.transpose(Uinv_sqrt).dot(D).dot(Uinv_sqrt)

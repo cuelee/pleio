@@ -6,34 +6,7 @@ import numpy as np
 import multiprocessing as mp
 from itertools import product
 from numbers import Number
-from numpy.core import empty, asarray, newaxis, amax, swapaxes, divide, matmul, multiply
-from numpy.linalg.linalg import svd
-
-def transpose(a):
-    """
-    Transpose each matrix in a stack of matrices.
-
-    Unlike np.transpose, this only swaps the last two axes, rather than all of
-    them
-
-    Parameters
-    ----------
-    a : (...,M,N) array_like
-
-    Returns
-    -------
-    aT : (...,N,M) ndarray
-    """
-    return swapaxes(a, -1, -2)
-
-def _is_empty_2d(arr):
-    # check size first for efficiency
-    return arr.size == 0 and product(arr.shape[-2:]) == 0
-
-def _makearray(a):
-    new = asarray(a)
-    wrap = getattr(a, "__array_prepare__", new.__array_wrap__)
-    return new, wrap
+from framework.utilities import sqrt_ginv
 
 def readf(f):
     d = pd.read_csv(f,names=['x','s'],sep=' ');
@@ -77,22 +50,6 @@ class cof_estimation():
         self.itck = interpolationf(d.iloc[1:,:]);
         self.tail = extrapolationf(d.loc[d.x >= 20,:])
 
-def sqrt_ginv(a, rcond=1e-15):
-    a, wrap = _makearray(a)
-    rcond = asarray(rcond)
-    if _is_empty_2d(a):
-        m, n = a.shape[-2:]
-        res = empty(a.shape[:-2] + (n, m), dtype=a.dtype)
-        return wrap(res)
-    a = a.conjugate()
-    u, s, vt = svd(a, full_matrices=False)
-    # discard small singular values
-    cutoff = rcond[..., newaxis] * amax(s, axis=-1, keepdims=True)
-    large = s > cutoff
-    s = divide(1, s**0.5, where=large, out=s)
-    s[~large] = 0 
-    res = matmul(transpose(vt), multiply(s[..., newaxis], transpose(u)))
-    return wrap(res)
 
 ### vcm_optimization
 def LL_fun(x,n,P_sq,w):
@@ -142,7 +99,7 @@ def parallelize(df_input, func, cores, partitions, n, w, t_v):
     pool.join()
     return(df_output)
 
-def pval_flattening(summary, gwas_N, gencov, envcor, cores, isf, tol = 2.22044604925e-16**0.5):
+def flattening_p_value(summary, gwas_N, gencov, envcor, cores, isf, tol = 2.22044604925e-16**0.5):
     ### set multi processing options 
     if(cores == 0):
         cores = mp.cpu_count() - 1; partitions = cores;
