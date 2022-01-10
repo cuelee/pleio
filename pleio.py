@@ -96,7 +96,7 @@ class generate_data(object):
         ind = np.array([i for i in range(len(c)) if i % 2 == 0])
         b = c[ind] 
         s = c[ind+1]
-        t = np.array([i.split('_beta')[0] for i in b])
+        t = np.vectorize(lambda x: x.split('_beta')[0])(b)
         n = int(len(t))
         return(t,b,s,n)
         
@@ -138,9 +138,6 @@ def pleio(args,log):
     log.log('Running PLEIO...');
 
     parallel_input = product(np.array_split(data.sumstat, data.ncpu), [data.gencov.values], [data.envcor.values], [data.isf_output])
-    for i in parallel_input:
-        print(i)
-        break
     res = parallel_computing(parallel_input, stat_estimation, data.ncpu);
 
     if args.flattening_p_values:
