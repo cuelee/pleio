@@ -14,21 +14,15 @@ cd pleio
 In order to run `pleio`, the following python dependencies must be installed in your system.
 
 - python >= 3.7.4
-- pandas >= 1.0.4
-- numpy = v.1.16.4
-- scipy >= v.1.4.1
-
-To install Python dependencies, you need to install an Anaconda python distribution from [LINK](https://www.anaconda.com). After installing Anaconda, run the following command to create an environment with pleio's dependencies.
-```
-conda env create -f environment.yml
-conda activate pleio
-```
+- pandas
+- numpy
+- scipy
 
 
 Once the above has completed, you can run the following command:
 
 ```
-./pleio -h
+./pleio,py -h
 ```
 
 ## Updating PLEIO
@@ -66,7 +60,7 @@ Lee, C. H., Shi, H., Pasaniuc, B., Eskin, E., & Han, B. (2021). PLEIO: a method 
 
 ## Support
 
-Issues with PLEIO? Email cuelee@snu.ac.kr
+Issues with PLEIO? Email hl3565@cumc.columbia.edu
 
 ## License 
 
@@ -74,4 +68,4 @@ This project has no license currently.
 
 ## Authors
 
-Cue Hyunkyu Lee ( Seoul National University )
+Cue Hyunkyu Lee ( Columbia University Irving Medical Center)
