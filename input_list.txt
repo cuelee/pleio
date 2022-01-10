@@ -1,3 +1,0 @@
-FILE	TYPE	SPREV	PPREV	NAME
-I9_CHD.ldsc.imputed_v3.both_sexes.tsv	binary	0.49229984453944814	0.05	UKBB_CAD
-30870_irnt.imputed_v3.ldsc.both_sexes.tsv	quantitative	nan	nan	UKBB_FG
