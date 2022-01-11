@@ -50,9 +50,6 @@ Fast-forward
  2 files changed, 2 insertions(+), 2 deletions(-)
 ```
 
-## Tutorial 
-If you want to try a joint analysis of 18 characteristics of cardiovascular diseases using the PLEIO framework, please use the following [Link](https://github.com/hanlab-SNU/pleio/wiki/Identification-of-pleiotropic-loci-with-PLEIO)
-
 ## Citation
 
 If you use the software, please cite  

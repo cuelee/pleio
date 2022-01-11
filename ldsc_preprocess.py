@@ -162,6 +162,7 @@ class generate_sumstat_data(object):
         self.check_sumstats()
         log.log('Final step: combine several summary statistical data')
         self.res = pd.DataFrame(index = self.common_snps)
+	self.res.index.rename(name='SNP', inplace=True)
         for trait in data.info.index:
             sprev, pprev, ptype = self.data.info.loc[trait,['sprev','pprev','phe']]
             eta, se = generate_pleio_input(self.sumstats[trait], trait, sprev, pprev, ptype)
