@@ -47,7 +47,7 @@ def blup_estimation(d, sg, ce, trait_name):
         y = x[ind]
         se = x[ind+1]
         tausq = np.max([10**-12,x[-1]])
-        G = np.multiply(pleio_stat, Sg) 
+        G = np.multiply(tausq, Sg) 
         R = np.diag(se).dot(Ce).dot(np.diag(se))
         return(mtag(y,G,R,c))
 
