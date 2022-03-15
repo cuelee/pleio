@@ -102,7 +102,7 @@ class generate_data(object):
         
     def read_metain(self,s):
         try:
-            col = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t')
+            col = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', nrows = 0)
             dtype_dict = dict(); dtype_dict[s] = 'str'
             for c in col: dtype_dict[c] = 'float'
             d = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', dtype = dtype_dict, na_filter = False)
