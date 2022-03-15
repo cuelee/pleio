@@ -18,6 +18,13 @@ def parallel_computing(iterable, function, ncpu):
     pool.join()
     return(results)
 
+def blup_optimization(y, G, R, c):
+    pinv_R = np.linalg.pinv(R)
+    pinv_G = np.linalg.pinv(G)
+    V = np.linalg.pinv(pinv_R + pinv_G)
+    u = V.dot(pinv_R).dot(y)
+    return(pd.Series(u, index = c))
+
 def stat_estimation(sumstat, sg, ce, isf):
     def run_PLEIO(arr, ind):
         b=arr[ind]
@@ -43,17 +50,17 @@ def stat_estimation(sumstat, sg, ce, isf):
     return(res)
 
 def blup_estimation(d, sg, ce, trait_name):
-    def run_BLUP(x, Sg, Ce, ind, c):
+    def run_BLUP(x, sg, ce, ind, c):
         y = x[ind]
         se = x[ind+1]
         tausq = np.max([10**-12,x[-1]])
-        G = np.multiply(tausq, Sg) 
-        R = np.diag(se).dot(Ce).dot(np.diag(se))
-        return(mtag(y,G,R,c))
+        G = np.multiply(tausq, sg) 
+        R = np.diag(se).dot(ce).dot(np.diag(se))
+        return(blup_optimization(y,G,R,c))
 
-    n = np.size(Sg,1)
+    n = np.size(sg,1)
     t = trait_name
-    ind = np.array([i*2 for i in range(n)])
-    d = df_data.apply(lambda x: run_BLUP(x.to_numpy(), Sg, Ce, ind, t), result_type = 'expand', axis=1)
+    ind = np.array([i*2 for i in range(n)], dtype = int)
+    d = d.apply(lambda x: run_BLUP(x.to_numpy(dtype = float), sg, ce, ind, t), result_type = 'expand', axis=1)
     return(d)
 
