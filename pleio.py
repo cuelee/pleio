@@ -102,10 +102,10 @@ class generate_data(object):
         
     def read_metain(self,s):
         try:
-            col = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', nrows = 0)
+            col = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t')
             dtype_dict = dict(); dtype_dict[s] = 'str'
             for c in col: dtype_dict[c] = 'float'
-            d = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', dtype = dtype_dict, na_filter = False, nrows = 1000)
+            d = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', dtype = dtype_dict, na_filter = False)
         except Exception:
             raise('All data in the summary statistics file should be numeric. NA values are not allowed')
         return(d)
