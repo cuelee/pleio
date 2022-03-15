@@ -32,8 +32,10 @@ def stat_estimation(sumstat, sg, ce, isf):
     n = len(np.diag(sg))
     ind = np.array([i*2 for i in range(n)])
     u = sqrt_ginv(sg); c = ce
-    res = pd.DataFrame(index = sumstat.index, columns = ['pleio_stat','LS_stat','pleio_p','LS_p'])
-    res.loc[:,'pleio_stat'] = sumstat.apply(lambda x: run_PLEIO(x.to_numpy(),ind), axis=1)
+    res = pd.DataFrame(index = sumstat.index, columns = ['tausq','pleio_stat','LS_stat','pleio_p','LS_p'])
+    pleio_res = sumstat.apply(lambda x: run_PLEIO(x.to_numpy(), ind), result_type = 'expand', axis=1)
+    res.loc[sumstat.index,['tausq','pleio_stat']] = pleio_res.loc[sumstat.index,['tausq','pleio_stat']]
+    del pleio_res
     res.loc[:,'LS_stat'] = sumstat.apply(lambda x: run_LS(x.to_numpy(), ind, ce), axis=1)
     pfunction = cof_estimation(isf);
     res.loc[:,'pleio_p'] = res.loc[:,'pleio_stat'].apply(lambda x: pvalue_estimation(x, pfunction));
@@ -45,7 +47,7 @@ def blup_estimation(d, sg, ce, trait_name):
         y = x[ind]
         se = x[ind+1]
         tausq = np.max([10**-12,x[-1]])
-        G = np.multiply(tausq, Sg) 
+        G = np.multiply(pleio_stat, Sg) 
         R = np.diag(se).dot(Ce).dot(np.diag(se))
         return(mtag(y,G,R,c))
 

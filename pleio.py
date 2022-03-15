@@ -105,7 +105,7 @@ class generate_data(object):
             col = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', nrows = 0)
             dtype_dict = dict(); dtype_dict[s] = 'str'
             for c in col: dtype_dict[c] = 'float'
-            d = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', dtype = dtype_dict, na_filter = False)
+            d = pd.read_csv(self.sumstat_fn, header = 'infer',compression = 'infer', index_col = s, sep='\t', dtype = dtype_dict, na_filter = False, nrows = 1000)
         except Exception:
             raise('All data in the summary statistics file should be numeric. NA values are not allowed')
         return(d)
