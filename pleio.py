@@ -152,7 +152,7 @@ def pleio(args,log):
         iterable = product(np.array_split(dat, data.ncpu), [data.gencov.values], [data.envcor.values],[data.trait_name])
     
         blup_estimates = parallel_computing(iterable, blup_estimation, data.ncpu);
-        blup_estimates.to_csv(self.output + '.blup.gz', index = True, sep ='\t', compression = 'gzip')
+        blup_estimates.to_csv(data.output + '.blup.gz', index = True, sep ='\t', compression = 'gzip')
 
     log.log('Work done');
     
