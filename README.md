@@ -49,6 +49,8 @@ Fast-forward
  ldsc_preprocess | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 ```
+## For first-time users
+Please check the WIKI section of this Github page for executable example files. [Link](https://github.com/cuelee/pleio/wiki)
 
 ## Citation
 
