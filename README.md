@@ -7,7 +7,7 @@
 
 In order to download `pleio`, you should clone this repository via the command
 ```
-git clone git://github.com/cuelee/pleio.git
+git clone https://github.com/cuelee/pleio.git
 cd pleio
 ```
 
