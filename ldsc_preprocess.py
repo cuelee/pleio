@@ -267,7 +267,7 @@ class generate_sumstat_data(object):
         def check_allele_mismatch(df):
             res = ~df.eq(df.iloc[:, 0],axis = 0).all(axis = 1)
             if np.sum(res) > 0:
-                s = df.index[res].to_numpy[0]
+                s = df.index[res].to_numpy(str)
                 raise ValueError('Found Allele mismatch: {}'.format(s))
         
         log.log('Number of variants in common: {}'.format(len(self.common_snps)))
