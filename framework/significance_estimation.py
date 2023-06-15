@@ -128,7 +128,7 @@ def flattening_p_value(summary, gwas_N, gencov, envcor, cores, isf, tol = 2.2204
     res_out['null_p'] = res_out.loc[:,'null_stat'].apply(lambda x: pvalue_estimation(x, p_functions));
     
     Nbin = 1000
-    bin_average = np.array(nsim/Nbin, dtype = np.float)
+    bin_average = np.array(nsim/Nbin, dtype=np.float64)
     
     def find_num(p,res):
         inds = np.floor(p * 1000)
@@ -156,6 +156,6 @@ def flattening_p_value(summary, gwas_N, gencov, envcor, cores, isf, tol = 2.2204
     random_unif_min = target_val
     random_unif_max = 1
     ind = summary.pleio_p > target_val
-    summary.loc[ind, 'pleio_p'] = np.array(np.random.uniform(low = random_unif_min, high = random_unif_max, size = sum(ind)),dtype=np.dtype(Decimal))
+    summary.loc[ind, 'pleio_p'] = np.random.uniform(low=random_unif_min, high=random_unif_max, size=sum(ind)).astype(np.float64)
         
     return(summary)
