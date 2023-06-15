@@ -99,63 +99,54 @@ def parallelize(df_input, func, cores, partitions, n, w, t_v):
     pool.join()
     return(df_output)
 
-def flattening_p_value(summary, gwas_N, gencov, envcor, cores, isf, tol = 2.22044604925e-16**0.5):
-    ### set multi processing options 
-    if(cores == 0):
-        cores = mp.cpu_count() - 1; partitions = cores;
+def flattening_p_value(summary, gwas_N, gencov, envcor, cores, isf, tol=2.22044604925e-16**0.5):
+    ### Set multiprocessing options
+    if cores == 0:
+        cores = mp.cpu_count() - 1
+        partitions = cores
     else:
-        partitions = cores;
+        partitions = cores
 
     U = gencov
     Ce = envcor
-    se = 1/(np.array(gwas_N)**0.5)
+    se = 1 / np.sqrt(np.array(gwas_N))
     np.random.seed(1)
-    n = len(se); nsim = 100000; 
-    D = np.diag(se).dot(Ce).dot(np.diag(se));null_D = np.diag([1]*n).dot(Ce).dot(np.diag([1]*n));
-    sqrt_U_inv = sqrt_ginv(U);
+    n = len(se)
+    nsim = 100000
+    D = np.diag(se).dot(Ce).dot(np.diag(se))
+    null_D = np.diag([1] * n).dot(Ce).dot(np.diag([1] * n))
+    sqrt_U_inv = sqrt_ginv(U)
     K = sqrt_U_inv.dot(D).dot(sqrt_U_inv)
-    w, v = np.linalg.eigh(K); t_v = np.transpose(v)
+    w, v = np.linalg.eigh(K)
+    t_v = np.transpose(v)
     pos = w > max(tol * w[0], 0)
     w_pos = w[pos]
     t_v_pos = t_v[pos]
 
-    null_df = pd.DataFrame(np.random.multivariate_normal(mean = [0]*n, cov = null_D, size = nsim));
-    eta_df = null_df.multiply(se, axis = 1)
-    transformed_df = eta_df.apply(func = lambda x: sqrt_U_inv.dot(x), axis = 1, raw = True)
+    null_df = pd.DataFrame(np.random.multivariate_normal(mean=[0] * n, cov=null_D, size=nsim))
+    eta_df = null_df.multiply(se, axis=1)
+    transformed_df = eta_df.apply(lambda x: sqrt_U_inv.dot(x), axis=1)
 
-    res_out = parallelize(transformed_df, estimate_statistics, cores, partitions, n, w_pos, t_v_pos )
-    p_functions = cof_estimation(isf);
-    res_out['null_p'] = res_out.loc[:,'null_stat'].apply(lambda x: pvalue_estimation(x, p_functions));
-    
+    res_out = parallelize(transformed_df, estimate_statistics, cores, partitions, n, w_pos, t_v_pos)
+    p_functions = cof_estimation(isf)
+    res_out['null_p'] = res_out['null_stat'].apply(lambda x: pvalue_estimation(x, p_functions))
+
     Nbin = 1000
-    bin_average = np.array(nsim/Nbin, dtype=np.float64)
-    
-    def find_num(p,res):
-        inds = np.floor(p * 1000)
-        for ind in inds:
-            res[int(ind)-1] += 1
-        return(res)
-    
-    res = np.array([0] * Nbin)
-    p = np.array(res_out.null_p.values, dtype = np.float)
-    res = find_num(p, res)
-    
-    bins = pd.DataFrame(index = [i for i in range(Nbin)], columns = ['start','end'])
-    bins.start = bins.index / Nbin
-    bins.end = (bins.index + 1) / Nbin
-    bins.loc[:,'num'] = res
-    bins.loc[:,'above_thres'] = bins.num > (bin_average * 0.1)
-    
-    for i in range(Nbin-2, 0, -1):
-        if bins.above_thres[i]:
-            target_i = i + 1
-            ind = (p > bins.start[target_i]) & (p <= bins.end[target_i])
-            target_val = max(p[ind])
-            break
-    
+    p = np.array(res_out.null_p.values)
+    res, _ = np.histogram(p, bins=Nbin, range=(0, 1))
+    bin_average = nsim / Nbin
+
+    bins = pd.DataFrame({'start': np.arange(Nbin) / Nbin,
+                         'end': (np.arange(Nbin) + 1) / Nbin,
+                         'num': res,
+                         'above_thres': res > (bin_average * 0.1)})
+
+    target_i = np.argmax(bins['above_thres'].values[:-1][::-1])
+    target_val = np.max(p[(p > bins['start'].values[target_i + 1]) & (p <= bins['end'].values[target_i + 1])])
+
     random_unif_min = target_val
     random_unif_max = 1
-    ind = summary.pleio_p > target_val
-    summary.loc[ind, 'pleio_p'] = np.random.uniform(low=random_unif_min, high=random_unif_max, size=sum(ind)).astype(np.float64)
-        
-    return(summary)
+    ind = summary['pleio_p'] > target_val
+    summary.loc[ind, 'pleio_p'] = np.random.uniform(low=random_unif_min, high=random_unif_max, size=sum(ind))
+
+    return summary
