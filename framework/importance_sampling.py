@@ -71,7 +71,6 @@ def mixture_sampling (N, alpha, P):
         Pj_df = pd.DataFrame(np.random.multivariate_normal(mean = Pj_mean, cov = Pj_cov, size = Pj_N));
         P[j].pdf = Pj_df
         input_df = pd.concat([input_df, Pj_df], ignore_index=True)
-        input_df = input_df.append(Pj_df,ignore_index=True);
     return(input_df);
 
 def h_t (ts,thres):
