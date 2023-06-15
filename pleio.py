@@ -10,6 +10,8 @@ PLEIO is a summary-statistic-based framework to map and interpret pleiotropic lo
 from framework.importance_sampling import importance_sampling
 from framework.assoc_test import parallel_computing, stat_estimation, blup_estimation
 from framework.utilities import is_pos_def
+from framework.significance_estimation import flattening_p_value
+
 import numpy as np
 import pandas as pd
 import os, sys, traceback, argparse, time
