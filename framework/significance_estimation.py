@@ -99,19 +99,19 @@ def parallelize(df_input, func, cores, partitions, n, w, t_v):
     pool.join()
     return(df_output)
 
-def quantile_mapping(s, N_bin = 100, lower_bound = 0.3):
+def quantile_mapping(s, N_bin = 1000):
     INDEX = s.index
     s = s.to_numpy()
     # Define the bin edges
-    bin_edges = np.linspace(lower_bound, 1, N_bin+1)
+    bin_edges = np.linspace(0.6, 1, N_bin+1)
 
     # Get the counts in each bin for values in s that are between 0.6 and 1 (exclusive)
-    hist, _ = np.histogram(s[(s > lower_bound) & (s <= 1)], bins=bin_edges)
+    hist, _ = np.histogram(s[(s > 0.6) & (s <= 1)], bins=bin_edges)
 
     # The target number of values in each bin is the total count divided by the number of bins
-    target_bin_count = len(s[s > lower_bound]) // N_bin
+    target_bin_count = len(s[s > 0.6]) // N_bin
     count_ones = np.sum(s == 1)
-    
+    ones_indices = np.flatnonzero(s == 1)
     # Now we will replace the 1's in s with values that are distributed evenly across the bins
     for i in range(N_bin):
         bin_count = hist[i]
@@ -124,9 +124,9 @@ def quantile_mapping(s, N_bin = 100, lower_bound = 0.3):
             new_values = np.random.uniform(bin_start, bin_end, size=values_to_add)
 
             # Find the first 'values_to_add' 1's in s and replace them with the new values
-            ones_indices = np.flatnonzero(s == 1)
             indices_to_replace = ones_indices[:values_to_add]
             s[indices_to_replace] = new_values
+            ones_indices = np.flatnonzero(s == 1)
             count_ones = len(ones_indices)
     return(pd.Series(s, index = INDEX, name = 'pleio_p'))
 
