@@ -87,7 +87,7 @@ def vcm_optimization (b, n, w, t_v):
 
 def estimate_statistics(df_data, n, w, t_v):
     df_out = pd.DataFrame(index = df_data.index)
-    df_out['null_stat'] = df_data.apply(lambda x: vcm_optimization(x.tolist(), n, w, t_v), axis=1)
+    df_out['null_stat'] = df_data.apply(lambda x: vcm_optimization(x.tolist(), n, w, t_v))
     return(df_out)
 
 def parallelize(df_input, func, cores, partitions, n, w, t_v):
@@ -99,54 +99,40 @@ def parallelize(df_input, func, cores, partitions, n, w, t_v):
     pool.join()
     return(df_output)
 
-def flattening_p_value(summary, gwas_N, gencov, envcor, cores, isf, tol=2.22044604925e-16**0.5):
-    ### Set multiprocessing options
-    if cores == 0:
-        cores = mp.cpu_count() - 1
-        partitions = cores
-    else:
-        partitions = cores
+def quantile_mapping(s, N_bin = 100):
+    INDEX = s.index
+    s = s.to_numpy()
+    # Define the bin edges
+    bin_edges = np.linspace(0.6, 1, N_bin+1)
 
-    U = gencov
-    Ce = envcor
-    se = 1 / np.sqrt(np.array(gwas_N))
-    np.random.seed(1)
-    n = len(se)
-    nsim = 100000
-    D = np.diag(se).dot(Ce).dot(np.diag(se))
-    null_D = np.diag([1] * n).dot(Ce).dot(np.diag([1] * n))
-    sqrt_U_inv = sqrt_ginv(U)
-    K = sqrt_U_inv.dot(D).dot(sqrt_U_inv)
-    w, v = np.linalg.eigh(K)
-    t_v = np.transpose(v)
-    pos = w > max(tol * w[0], 0)
-    w_pos = w[pos]
-    t_v_pos = t_v[pos]
+    # Get the counts in each bin for values in s that are between 0.6 and 1 (exclusive)
+    hist, _ = np.histogram(s[(s > 0.6) & (s <= 1)], bins=bin_edges)
 
-    null_df = pd.DataFrame(np.random.multivariate_normal(mean=[0] * n, cov=null_D, size=nsim))
-    eta_df = null_df.multiply(se, axis=1)
-    transformed_df = eta_df.apply(lambda x: sqrt_U_inv.dot(x), axis=1)
+    # The target number of values in each bin is the total count divided by the number of bins
+    target_bin_count = len(s[s > 0.6]) // N_bin
+    count_ones = np.sum(s == 1)
+    
+    # Now we will replace the 1's in s with values that are distributed evenly across the bins
+    for i in range(N_bin):
+        bin_count = hist[i]
+        values_to_add = target_bin_count - bin_count
+        values_to_add = np.min([values_to_add, count_ones])
+        if values_to_add > 0:
+            # Generate 'values_to_add' random values within this bin
+            bin_start = bin_edges[i]
+            bin_end = bin_edges[i+1]
+            new_values = np.random.uniform(bin_start, bin_end, size=values_to_add)
 
-    res_out = parallelize(transformed_df, estimate_statistics, cores, partitions, n, w_pos, t_v_pos)
-    p_functions = cof_estimation(isf)
-    res_out['null_p'] = res_out['null_stat'].apply(lambda x: pvalue_estimation(x, p_functions))
+            # Find the first 'values_to_add' 1's in s and replace them with the new values
+            ones_indices = np.flatnonzero(s == 1)
+            indices_to_replace = ones_indices[:values_to_add]
+            s[indices_to_replace] = new_values
+            count_ones = len(ones_indices)
+    return(pd.Series(s, index = INDEX, name = 'pleio_p'))
 
-    Nbin = 1000
-    p = np.array(res_out.null_p.values)
-    res, _ = np.histogram(p, bins=Nbin, range=(0, 1))
-    bin_average = nsim / Nbin
-
-    bins = pd.DataFrame({'start': np.arange(Nbin) / Nbin,
-                         'end': (np.arange(Nbin) + 1) / Nbin,
-                         'num': res,
-                         'above_thres': res > (bin_average * 0.1)})
-
-    target_i = np.argmax(bins['above_thres'].values[:-1][::-1])
-    target_val = np.max(p[(p > bins['start'].values[target_i + 1]) & (p <= bins['end'].values[target_i + 1])])
-
-    random_unif_min = target_val
-    random_unif_max = 1
-    ind = summary['pleio_p'] > target_val
-    summary.loc[ind, 'pleio_p'] = np.random.uniform(low=random_unif_min, high=random_unif_max, size=sum(ind))
+def flattening_p_value(summary):
+    summary = summary.copy()  # create a copy of the DataFrame to avoid modifying the original data
+    s = summary['pleio_p']
+    summary.loc[:, 'pleio_p'] = quantile_mapping(s)
 
     return summary

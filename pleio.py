@@ -143,7 +143,8 @@ def pleio(args,log):
     res = parallel_computing(parallel_input, stat_estimation, data.ncpu);
 
     if args.flattening_p_values:
-        res = flattening_p_value(res, data.N_sample, data.gencov, data.envcor, data.ncpu , data.isf_output )
+        log.log('Run Flattening');
+        res = flattening_p_value(res)
     
     log.log('Writing PLEIO output file');
     res.to_csv(data.pleio_output, index = True, sep='\t', compression='gzip');
