@@ -7,6 +7,7 @@ from itertools import product
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
+import warnings
 
 def parallel_computing(iterable, function, ncpu): 
     '''
@@ -32,7 +33,10 @@ def blup_optimization(y, G, R, c):
     u = V.dot(pinv_R).dot(y)
     
     # Calculating standard errors: sqrt of diagonal elements of V
-    se_u = np.sqrt(np.diag(V))
+    # Suppress RuntimeWarning
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # Ignore RuntimeWarning
+        se_u = np.sqrt(np.diag(V))
 
     # Combine u and se_u into a single vector
     combined_values = np.empty(u.size + se_u.size, dtype=u.dtype)
