@@ -18,12 +18,31 @@ def parallel_computing(iterable, function, ncpu):
     pool.join()
     return(results)
 
-def blup_optimization(y, G, R, c):
+def blup_optimization_old(y, G, R, c):
     pinv_R = np.linalg.pinv(R)
     pinv_G = np.linalg.pinv(G)
     V = np.linalg.pinv(pinv_R + pinv_G)
     u = V.dot(pinv_R).dot(y)
     return(pd.Series(u, index = c))
+
+def blup_optimization(y, G, R, c):
+    pinv_R = np.linalg.pinv(R)
+    pinv_G = np.linalg.pinv(G)
+    V = np.linalg.pinv(pinv_R + pinv_G)  # This is the key step for variance estimation
+    u = V.dot(pinv_R).dot(y)
+    
+    # Calculating standard errors: sqrt of diagonal elements of V
+    se_u = np.sqrt(np.diag(V))
+
+    # Combine u and se_u into a single vector
+    combined_values = np.empty(u.size + se_u.size, dtype=u.dtype)
+    combined_values[0::2] = u
+    combined_values[1::2] = se_u
+
+    # Generate combined index strings
+    combined_index = sum([[x, x + '_se'] for x in c], []) 
+
+    return pd.Series(combined_values, index=combined_index)
 
 def stat_estimation(sumstat, sg, ce, isf):
     def run_PLEIO(arr, ind):
