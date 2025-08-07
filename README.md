@@ -22,7 +22,7 @@ In order to run `pleio`, the following python dependencies must be installed in 
 Once the above has completed, you can run the following command:
 
 ```
-./pleio,py -h
+./pleio.py -h
 ```
 
 ## Updating PLEIO
